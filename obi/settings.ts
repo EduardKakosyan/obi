@@ -18,7 +18,7 @@ export interface ObiSettings {
 
 export const DEFAULT_SETTINGS: ObiSettings = {
 	endpoint: "http://localhost:1234/v1",
-	model: "default",
+	model: "mistralai/ministral-3-14b-reasoning",
 	apiKey: "",
 	maxContextFiles: 5,
 	maxContextTokens: 2000,
@@ -57,7 +57,7 @@ export class ObiSettingTab extends PluginSettingTab {
 			.setDesc("The model identifier to use for chat completions.")
 			.addText((text) =>
 				text
-					.setPlaceholder("default")
+					.setPlaceholder("mistralai/ministral-3-14b-reasoning")
 					.setValue(this.plugin.settings.model)
 					.onChange(async (value) => {
 						this.plugin.settings.model = value;

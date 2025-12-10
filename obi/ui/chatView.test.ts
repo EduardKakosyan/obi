@@ -5,8 +5,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
  * These tests focus on the file search and mention parsing logic
  */
 
-// Mock Omnisearch API types for testing
-interface MockOmnisearchResult {
+// Mock Omnisearch HTTP API response type
+interface MockOmnisearchHttpResult {
 	score: number;
 	vault: string;
 	path: string;
@@ -16,40 +16,22 @@ interface MockOmnisearchResult {
 	excerpt: string;
 }
 
-interface MockOmnisearchApi {
-	search: (query: string) => Promise<MockOmnisearchResult[]>;
-}
+// Mock fetch globally
+const mockFetch = vi.fn();
+vi.stubGlobal("fetch", mockFetch);
 
 describe("@ Mention File Search", () => {
-	let mockOmnisearch: MockOmnisearchApi;
-
 	beforeEach(() => {
-		// Create mock Omnisearch API
-		mockOmnisearch = {
-			search: vi.fn(),
-		};
 		vi.clearAllMocks();
 	});
 
 	afterEach(() => {
-		// Clean up global omnisearch
-		if ("omnisearch" in globalThis) {
-			delete (globalThis as Record<string, unknown>).omnisearch;
-		}
+		vi.restoreAllMocks();
 	});
 
-	describe("Omnisearch Integration", () => {
-		it("should detect when Omnisearch is available", () => {
-			expect(typeof globalThis.omnisearch).toBe("undefined");
-
-			// Simulate Omnisearch being available
-			(globalThis as Record<string, unknown>).omnisearch = mockOmnisearch;
-
-			expect(typeof globalThis.omnisearch).not.toBe("undefined");
-		});
-
-		it("should call Omnisearch search with query", async () => {
-			const mockResults: MockOmnisearchResult[] = [
+	describe("Omnisearch HTTP Server Integration", () => {
+		it("should call Omnisearch HTTP endpoint with query", async () => {
+			const mockResults: MockOmnisearchHttpResult[] = [
 				{
 					score: 10,
 					vault: "test-vault",
@@ -59,50 +41,72 @@ describe("@ Mention File Search", () => {
 					matches: [{ match: "meeting", offset: 0 }],
 					excerpt: "Meeting notes from today...",
 				},
-				{
-					score: 8,
-					vault: "test-vault",
-					path: "projects/project-plan.md",
-					basename: "project-plan",
-					foundWords: ["project"],
-					matches: [{ match: "project", offset: 0 }],
-					excerpt: "Project planning document...",
-				},
 			];
 
-			mockOmnisearch.search = vi.fn().mockResolvedValue(mockResults);
-			(globalThis as Record<string, unknown>).omnisearch = mockOmnisearch;
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve(mockResults),
+			});
 
-			const results = await globalThis.omnisearch!.search("meeting");
+			const port = 51361;
+			const query = "meeting";
+			const url = `http://localhost:${port}/search?q=${encodeURIComponent(
+				query
+			)}`;
 
-			expect(mockOmnisearch.search).toHaveBeenCalledWith("meeting");
-			expect(results).toHaveLength(2);
+			const response = await fetch(url);
+			const results = await response.json();
+
+			expect(mockFetch).toHaveBeenCalledWith(url);
+			expect(results).toHaveLength(1);
 			expect(results[0].basename).toBe("meeting-notes");
-			expect(results[0].excerpt).toBe("Meeting notes from today...");
 		});
 
-		it("should handle empty Omnisearch results", async () => {
-			mockOmnisearch.search = vi.fn().mockResolvedValue([]);
-			(globalThis as Record<string, unknown>).omnisearch = mockOmnisearch;
+		it("should handle HTTP server not running", async () => {
+			mockFetch.mockRejectedValueOnce(new Error("Connection refused"));
 
-			const results = await globalThis.omnisearch!.search("nonexistent");
+			const port = 51361;
+			const url = `http://localhost:${port}/search?q=test`;
 
-			expect(results).toHaveLength(0);
+			await expect(fetch(url)).rejects.toThrow("Connection refused");
 		});
 
-		it("should handle Omnisearch errors gracefully", async () => {
-			mockOmnisearch.search = vi
-				.fn()
-				.mockRejectedValue(new Error("Omnisearch error"));
-			(globalThis as Record<string, unknown>).omnisearch = mockOmnisearch;
+		it("should handle HTTP error responses", async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: false,
+				status: 500,
+				statusText: "Internal Server Error",
+			});
 
-			await expect(
-				globalThis.omnisearch!.search("test")
-			).rejects.toThrow("Omnisearch error");
+			const response = await fetch(
+				"http://localhost:51361/search?q=test"
+			);
+
+			expect(response.ok).toBe(false);
+			expect(response.status).toBe(500);
 		});
 
-		it("should return results with score and excerpt", async () => {
-			const mockResults: MockOmnisearchResult[] = [
+		it("should properly encode query parameters", () => {
+			const query = "2025 meeting notes";
+			const encoded = encodeURIComponent(query);
+			const url = `http://localhost:51361/search?q=${encoded}`;
+
+			expect(url).toBe(
+				"http://localhost:51361/search?q=2025%20meeting%20notes"
+			);
+		});
+
+		it("should handle special characters in query", () => {
+			const query = "meeting @work #important";
+			const encoded = encodeURIComponent(query);
+			const url = `http://localhost:51361/search?q=${encoded}`;
+
+			expect(url).toContain("search?q=");
+			expect(encoded).toBe("meeting%20%40work%20%23important");
+		});
+
+		it("should return results with all required fields", async () => {
+			const mockResults: MockOmnisearchHttpResult[] = [
 				{
 					score: 15.5,
 					vault: "test-vault",
@@ -117,15 +121,35 @@ describe("@ Mention File Search", () => {
 				},
 			];
 
-			mockOmnisearch.search = vi.fn().mockResolvedValue(mockResults);
-			(globalThis as Record<string, unknown>).omnisearch = mockOmnisearch;
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve(mockResults),
+			});
 
-			const results = await globalThis.omnisearch!.search("test query");
+			const response = await fetch(
+				"http://localhost:51361/search?q=test"
+			);
+			const results: MockOmnisearchHttpResult[] = await response.json();
 
 			expect(results[0].score).toBe(15.5);
 			expect(results[0].excerpt).toBe("This is a test query example...");
+			expect(results[0].path).toBe("folder/subfolder/note.md");
+			expect(results[0].basename).toBe("note");
 			expect(results[0].foundWords).toContain("test");
-			expect(results[0].foundWords).toContain("query");
+		});
+
+		it("should handle empty results array", async () => {
+			mockFetch.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve([]),
+			});
+
+			const response = await fetch(
+				"http://localhost:51361/search?q=nonexistent"
+			);
+			const results = await response.json();
+
+			expect(results).toHaveLength(0);
 		});
 	});
 
@@ -360,7 +384,7 @@ describe("@ Mention File Search", () => {
 		}
 
 		const formatOmnisearchResults = (
-			results: MockOmnisearchResult[]
+			results: MockOmnisearchHttpResult[]
 		): FileSuggestion[] => {
 			return results.slice(0, 10).map((result) => {
 				const parentPath = result.path.includes("/")
@@ -377,7 +401,7 @@ describe("@ Mention File Search", () => {
 		};
 
 		it("should format Omnisearch results correctly", () => {
-			const omnisearchResults: MockOmnisearchResult[] = [
+			const omnisearchResults: MockOmnisearchHttpResult[] = [
 				{
 					score: 10,
 					vault: "vault",
@@ -399,7 +423,7 @@ describe("@ Mention File Search", () => {
 		});
 
 		it("should handle root-level files", () => {
-			const omnisearchResults: MockOmnisearchResult[] = [
+			const omnisearchResults: MockOmnisearchHttpResult[] = [
 				{
 					score: 5,
 					vault: "vault",
@@ -417,7 +441,7 @@ describe("@ Mention File Search", () => {
 		});
 
 		it("should limit results to 10", () => {
-			const manyResults: MockOmnisearchResult[] = Array.from(
+			const manyResults: MockOmnisearchHttpResult[] = Array.from(
 				{ length: 20 },
 				(_, i) => ({
 					score: 20 - i,
@@ -436,7 +460,7 @@ describe("@ Mention File Search", () => {
 		});
 
 		it("should handle deeply nested paths", () => {
-			const omnisearchResults: MockOmnisearchResult[] = [
+			const omnisearchResults: MockOmnisearchHttpResult[] = [
 				{
 					score: 8,
 					vault: "vault",
@@ -471,7 +495,9 @@ describe("@ Mention File Search", () => {
 				.filter((file) => {
 					const name = file.basename.toLowerCase();
 					const path = file.path.toLowerCase();
-					return name.includes(lowerQuery) || path.includes(lowerQuery);
+					return (
+						name.includes(lowerQuery) || path.includes(lowerQuery)
+					);
 				})
 				.sort((a, b) => {
 					const aBasename = a.basename.toLowerCase();
@@ -486,7 +512,11 @@ describe("@ Mention File Search", () => {
 		};
 
 		const mockFiles: MockFile[] = [
-			{ path: "meeting-notes.md", basename: "meeting-notes", parent: null },
+			{
+				path: "meeting-notes.md",
+				basename: "meeting-notes",
+				parent: null,
+			},
 			{
 				path: "projects/project-plan.md",
 				basename: "project-plan",
@@ -518,7 +548,9 @@ describe("@ Mention File Search", () => {
 			const results = fallbackSearch(mockFiles, "projects");
 
 			expect(results.length).toBe(2);
-			expect(results.every((f) => f.path.includes("projects"))).toBe(true);
+			expect(results.every((f) => f.path.includes("projects"))).toBe(
+				true
+			);
 		});
 
 		it("should prioritize basename matches that start with query", () => {
@@ -542,11 +574,14 @@ describe("@ Mention File Search", () => {
 		});
 
 		it("should limit results to 10", () => {
-			const manyFiles: MockFile[] = Array.from({ length: 20 }, (_, i) => ({
-				path: `note${i}.md`,
-				basename: `note${i}`,
-				parent: null,
-			}));
+			const manyFiles: MockFile[] = Array.from(
+				{ length: 20 },
+				(_, i) => ({
+					path: `note${i}.md`,
+					basename: `note${i}`,
+					parent: null,
+				})
+			);
 
 			const results = fallbackSearch(manyFiles, "note");
 
@@ -554,4 +589,3 @@ describe("@ Mention File Search", () => {
 		});
 	});
 });
-

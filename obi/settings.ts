@@ -14,6 +14,10 @@ export interface ObiSettings {
 	maxContextTokens: number;
 	/** Whether to include vault context in queries */
 	enableContext: boolean;
+	/** Omnisearch HTTP server port */
+	omnisearchPort: number;
+	/** Whether to use Omnisearch HTTP server for file search */
+	useOmnisearchHttp: boolean;
 }
 
 export const DEFAULT_SETTINGS: ObiSettings = {
@@ -23,6 +27,8 @@ export const DEFAULT_SETTINGS: ObiSettings = {
 	maxContextFiles: 5,
 	maxContextTokens: 2000,
 	enableContext: true,
+	omnisearchPort: 51361,
+	useOmnisearchHttp: true,
 };
 
 export class ObiSettingTab extends PluginSettingTab {
@@ -41,7 +47,9 @@ export class ObiSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("LM Studio endpoint")
-			.setDesc("The URL of your local LM Studio server (OpenAI-compatible API).")
+			.setDesc(
+				"The URL of your local LM Studio server (OpenAI-compatible API)."
+			)
 			.addText((text) =>
 				text
 					.setPlaceholder("http://localhost:1234/v1")
@@ -67,7 +75,9 @@ export class ObiSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("API key")
-			.setDesc("Optional API key if your LM Studio server requires authentication.")
+			.setDesc(
+				"Optional API key if your LM Studio server requires authentication."
+			)
 			.addText((text) =>
 				text
 					.setPlaceholder("Leave empty if not required")
@@ -82,7 +92,9 @@ export class ObiSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Enable vault context")
-			.setDesc("Include relevant notes from your vault when answering questions.")
+			.setDesc(
+				"Include relevant notes from your vault when answering questions."
+			)
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.enableContext)
@@ -108,7 +120,9 @@ export class ObiSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Max context tokens")
-			.setDesc("Approximate maximum tokens to include from context files.")
+			.setDesc(
+				"Approximate maximum tokens to include from context files."
+			)
 			.addSlider((slider) =>
 				slider
 					.setLimits(500, 8000, 100)
@@ -119,6 +133,39 @@ export class ObiSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		containerEl.createEl("h3", { text: "Omnisearch settings" });
+
+		new Setting(containerEl)
+			.setName("Use Omnisearch HTTP server")
+			.setDesc(
+				"Use Omnisearch's HTTP server for file search. Enable the HTTP server in Omnisearch settings first."
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.useOmnisearchHttp)
+					.onChange(async (value) => {
+						this.plugin.settings.useOmnisearchHttp = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Omnisearch server port")
+			.setDesc(
+				"The port Omnisearch HTTP server runs on (default: 51361)."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("51361")
+					.setValue(String(this.plugin.settings.omnisearchPort))
+					.onChange(async (value) => {
+						const port = parseInt(value, 10);
+						if (!isNaN(port) && port > 0 && port < 65536) {
+							this.plugin.settings.omnisearchPort = port;
+							await this.plugin.saveSettings();
+						}
+					})
+			);
 	}
 }
-

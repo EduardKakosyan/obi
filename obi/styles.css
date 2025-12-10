@@ -175,7 +175,9 @@
 }
 
 @keyframes obi-bounce {
-	0%, 80%, 100% {
+	0%,
+	80%,
+	100% {
 		transform: scale(0.6);
 		opacity: 0.5;
 	}
@@ -201,4 +203,214 @@
 
 .obi-messages-container::-webkit-scrollbar-thumb:hover {
 	background: var(--text-muted);
+}
+
+/* @ Mention Suggestions - Cursor-like styling */
+.obi-input-wrapper {
+	position: relative;
+}
+
+.obi-suggestions {
+	position: absolute;
+	bottom: 100%;
+	left: 0;
+	right: 0;
+	margin-bottom: 4px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+	max-height: 350px;
+	overflow: hidden;
+	z-index: 1000;
+	display: flex;
+	flex-direction: column;
+}
+
+.obi-suggestions-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+}
+
+.obi-suggestions-title {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: var(--text-muted);
+}
+
+.obi-suggestions-count {
+	font-size: 11px;
+	color: var(--text-faint);
+}
+
+.obi-suggestions-list {
+	flex: 1;
+	overflow-y: auto;
+	max-height: 280px;
+}
+
+.obi-suggestion-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 12px;
+	cursor: pointer;
+	transition: background 0.1s ease;
+	border-left: 2px solid transparent;
+}
+
+.obi-suggestion-item:hover,
+.obi-suggestion-item.is-selected {
+	background: var(--background-modifier-hover);
+	border-left-color: var(--interactive-accent);
+}
+
+.obi-suggestion-icon {
+	color: var(--text-muted);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 18px;
+	height: 18px;
+}
+
+.obi-suggestion-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.obi-suggestion-text {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.obi-suggestion-name {
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin-bottom: 2px;
+}
+
+.obi-suggestion-path {
+	font-size: 11px;
+	color: var(--text-faint);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.obi-suggestion-excerpt {
+	font-size: 11px;
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin-bottom: 2px;
+}
+
+.obi-suggestion-score {
+	font-size: 10px;
+	font-weight: 600;
+	color: var(--text-faint);
+	background: var(--background-modifier-border);
+	padding: 2px 6px;
+	border-radius: 4px;
+	flex-shrink: 0;
+}
+
+.obi-suggestions-hint {
+	padding: 6px 12px;
+	border-top: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	font-size: 11px;
+	color: var(--text-faint);
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.obi-suggestions-hint kbd {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 2px 5px;
+	font-size: 10px;
+	font-family: inherit;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 3px;
+	box-shadow: 0 1px 0 var(--background-modifier-border);
+}
+
+.obi-no-results {
+	padding: 20px 12px;
+	text-align: center;
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+/* Suggestions scrollbar */
+.obi-suggestions-list::-webkit-scrollbar {
+	width: 6px;
+}
+
+.obi-suggestions-list::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.obi-suggestions-list::-webkit-scrollbar-thumb {
+	background: var(--background-modifier-border);
+	border-radius: 3px;
+}
+
+.obi-suggestions-list::-webkit-scrollbar-thumb:hover {
+	background: var(--text-muted);
+}
+
+/* Mention chips in messages */
+.obi-mention-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 8px;
+	padding-top: 8px;
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.obi-mention-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 8px;
+	background: rgba(255, 255, 255, 0.15);
+	border-radius: 4px;
+	font-size: 12px;
+	cursor: pointer;
+	transition: background 0.15s ease;
+}
+
+.obi-mention-chip:hover {
+	background: rgba(255, 255, 255, 0.25);
+}
+
+.obi-mention-chip-icon {
+	display: flex;
+	align-items: center;
+	opacity: 0.8;
+}
+
+.obi-mention-chip-icon svg {
+	width: 12px;
+	height: 12px;
 }

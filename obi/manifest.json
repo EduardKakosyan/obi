@@ -1,0 +1,9 @@
+{
+	"id": "obi",
+	"name": "Obi",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "A vault copilot agent that answers questions about your notes using a local LM Studio model.",
+	"author": "Eduard Kakosyan",
+	"isDesktopOnly": false
+}

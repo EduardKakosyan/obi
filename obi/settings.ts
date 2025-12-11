@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, Notice } from "obsidian";
 import type ObiPlugin from "./main";
 
 export interface ObiSettings {
@@ -18,6 +18,24 @@ export interface ObiSettings {
 	omnisearchPort: number;
 	/** Whether to use Omnisearch HTTP server for file search */
 	useOmnisearchHttp: boolean;
+
+	// Semantic Search Settings
+	/** Whether to use semantic search (embeddings) instead of keyword search */
+	useSemanticSearch: boolean;
+	/** Ollama endpoint for embeddings */
+	embeddingEndpoint: string;
+	/** Embedding model to use */
+	embeddingModel: string;
+	/** ChromaDB endpoint */
+	chromaEndpoint: string;
+	/** ChromaDB collection name */
+	chromaCollection: string;
+	/** Minimum similarity score for search results (0-1) */
+	minSimilarityScore: number;
+	/** Chunk size for document chunking (tokens) */
+	chunkSize: number;
+	/** Chunk overlap (tokens) */
+	chunkOverlap: number;
 }
 
 export const DEFAULT_SETTINGS: ObiSettings = {
@@ -25,10 +43,20 @@ export const DEFAULT_SETTINGS: ObiSettings = {
 	model: "mistralai/ministral-3-14b-reasoning",
 	apiKey: "",
 	maxContextFiles: 5,
-	maxContextTokens: 2000,
+	maxContextTokens: 4000,
 	enableContext: true,
 	omnisearchPort: 51361,
 	useOmnisearchHttp: true,
+
+	// Semantic Search Defaults
+	useSemanticSearch: true,
+	embeddingEndpoint: "http://localhost:11434",
+	embeddingModel: "mxbai-embed-large",
+	chromaEndpoint: "http://localhost:8000",
+	chromaCollection: "obi-vault",
+	minSimilarityScore: 0.3,
+	chunkSize: 500,
+	chunkOverlap: 50,
 };
 
 export class ObiSettingTab extends PluginSettingTab {
@@ -44,6 +72,9 @@ export class ObiSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		containerEl.createEl("h2", { text: "Obi settings" });
+
+		// LLM Settings
+		containerEl.createEl("h3", { text: "Language model" });
 
 		new Setting(containerEl)
 			.setName("LM Studio endpoint")
@@ -88,6 +119,134 @@ export class ObiSettingTab extends PluginSettingTab {
 					})
 			);
 
+		// Semantic Search Settings
+		containerEl.createEl("h3", { text: "Semantic search (RAG)" });
+
+		new Setting(containerEl)
+			.setName("Enable semantic search")
+			.setDesc(
+				"Use embedding-based semantic search instead of keyword search. Requires Ollama and ChromaDB running locally."
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.useSemanticSearch)
+					.onChange(async (value) => {
+						this.plugin.settings.useSemanticSearch = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Ollama endpoint")
+			.setDesc("The URL of your local Ollama server for embeddings.")
+			.addText((text) =>
+				text
+					.setPlaceholder("http://localhost:11434")
+					.setValue(this.plugin.settings.embeddingEndpoint)
+					.onChange(async (value) => {
+						this.plugin.settings.embeddingEndpoint = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Embedding model")
+			.setDesc(
+				"The Ollama model to use for embeddings (e.g., nomic-embed-text, mxbai-embed-large)."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("nomic-embed-text")
+					.setValue(this.plugin.settings.embeddingModel)
+					.onChange(async (value) => {
+						this.plugin.settings.embeddingModel = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("ChromaDB endpoint")
+			.setDesc("The URL of your local ChromaDB server.")
+			.addText((text) =>
+				text
+					.setPlaceholder("http://localhost:8000")
+					.setValue(this.plugin.settings.chromaEndpoint)
+					.onChange(async (value) => {
+						this.plugin.settings.chromaEndpoint = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Collection name")
+			.setDesc("ChromaDB collection name to store vault embeddings.")
+			.addText((text) =>
+				text
+					.setPlaceholder("obi-vault")
+					.setValue(this.plugin.settings.chromaCollection)
+					.onChange(async (value) => {
+						this.plugin.settings.chromaCollection = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Minimum similarity score")
+			.setDesc(
+				"Minimum similarity score (0-1) for search results. Lower = more results."
+			)
+			.addSlider((slider) =>
+				slider
+					.setLimits(0.1, 0.9, 0.05)
+					.setValue(this.plugin.settings.minSimilarityScore)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.minSimilarityScore = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Chunk size")
+			.setDesc(
+				"Target size for document chunks in tokens. Smaller = more precise, larger = more context."
+			)
+			.addSlider((slider) =>
+				slider
+					.setLimits(200, 1000, 50)
+					.setValue(this.plugin.settings.chunkSize)
+					.setDynamicTooltip()
+					.onChange(async (value) => {
+						this.plugin.settings.chunkSize = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		// Index Management
+		new Setting(containerEl)
+			.setName("Test connections")
+			.setDesc("Test connections to Ollama and ChromaDB servers.")
+			.addButton((button) =>
+				button.setButtonText("Test").onClick(async () => {
+					await this.testConnections();
+				})
+			);
+
+		new Setting(containerEl)
+			.setName("Reindex vault")
+			.setDesc(
+				"Force a full reindex of all vault files. Use if search results are stale."
+			)
+			.addButton((button) =>
+				button
+					.setButtonText("Reindex")
+					.setWarning()
+					.onClick(async () => {
+						await this.triggerReindex();
+					})
+			);
+
+		// Context Settings
 		containerEl.createEl("h3", { text: "Context settings" });
 
 		new Setting(containerEl)
@@ -134,12 +293,13 @@ export class ObiSettingTab extends PluginSettingTab {
 					})
 			);
 
-		containerEl.createEl("h3", { text: "Omnisearch settings" });
+		// Omnisearch Settings
+		containerEl.createEl("h3", { text: "Omnisearch (file suggestions)" });
 
 		new Setting(containerEl)
 			.setName("Use Omnisearch HTTP server")
 			.setDesc(
-				"Use Omnisearch's HTTP server for file search. Enable the HTTP server in Omnisearch settings first."
+				"Use Omnisearch's HTTP server for @ file suggestions. Enable the HTTP server in Omnisearch settings first."
 			)
 			.addToggle((toggle) =>
 				toggle
@@ -167,5 +327,59 @@ export class ObiSettingTab extends PluginSettingTab {
 						}
 					})
 			);
+	}
+
+	private async testConnections(): Promise<void> {
+		const notice = new Notice("Testing connections...", 0);
+
+		try {
+			const results: string[] = [];
+
+			// Test Ollama
+			if (this.plugin.embeddingClient) {
+				const ollamaOk =
+					await this.plugin.embeddingClient.testConnection();
+				results.push(ollamaOk ? "✓ Ollama" : "✗ Ollama");
+			} else {
+				results.push("✗ Ollama (not initialized)");
+			}
+
+			// Test ChromaDB
+			if (this.plugin.vectorStore) {
+				const chromaOk = await this.plugin.vectorStore.testConnection();
+				results.push(chromaOk ? "✓ ChromaDB" : "✗ ChromaDB");
+			} else {
+				results.push("✗ ChromaDB (not initialized)");
+			}
+
+			notice.hide();
+			new Notice(results.join("\n"), 5000);
+		} catch (e) {
+			notice.hide();
+			new Notice(`Connection test failed: ${e}`, 5000);
+		}
+	}
+
+	private async triggerReindex(): Promise<void> {
+		if (!this.plugin.indexManager) {
+			new Notice("Index manager not initialized");
+			return;
+		}
+
+		if (this.plugin.indexManager.isCurrentlyIndexing()) {
+			new Notice("Indexing already in progress");
+			return;
+		}
+
+		const notice = new Notice("Reindexing vault...", 0);
+
+		try {
+			const count = await this.plugin.indexManager.fullReindex();
+			notice.hide();
+			new Notice(`Reindex complete: ${count} files indexed`, 5000);
+		} catch (e) {
+			notice.hide();
+			new Notice(`Reindex failed: ${e}`, 5000);
+		}
 	}
 }

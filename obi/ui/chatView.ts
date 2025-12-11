@@ -684,23 +684,72 @@ export class ObiChatView extends ItemView {
 
 			// Add auto-searched context if enabled
 			if (this.plugin.settings.enableContext) {
-				const snippets = await this.contextProvider.gatherContext(
-					displayQuery
-				);
-				// Filter out already-mentioned files
-				const mentionedPaths = new Set(
-					mentionedFiles.map((m) => m.file.path)
-				);
-				const filteredSnippets = snippets.filter(
-					(s) => !mentionedPaths.has(s.filePath)
-				);
+				const mentionedPaths = mentionedFiles.map((m) => m.file.path);
 
-				const autoContext =
-					this.contextProvider.formatContextForPrompt(
-						filteredSnippets
+				// Use semantic search if enabled and available
+				if (
+					this.plugin.settings.useSemanticSearch &&
+					this.plugin.semanticSearch
+				) {
+					try {
+						const snippets =
+							await this.plugin.semanticSearch.searchWithMentions(
+								displayQuery,
+								mentionedPaths
+							);
+
+						// Filter out already-mentioned files
+						const mentionedPathSet = new Set(mentionedPaths);
+						const filteredSnippets = snippets.filter(
+							(s) => !mentionedPathSet.has(s.filePath)
+						);
+
+						const autoContext =
+							this.plugin.semanticSearch.formatContextForPrompt(
+								filteredSnippets
+							);
+						if (autoContext) {
+							contextPrompt += autoContext;
+						}
+					} catch (e) {
+						console.warn(
+							"[Obi] Semantic search failed, falling back to keyword search:",
+							e
+						);
+						// Fall back to keyword search
+						const snippets =
+							await this.contextProvider.gatherContext(
+								displayQuery
+							);
+						const mentionedPathSet = new Set(mentionedPaths);
+						const filteredSnippets = snippets.filter(
+							(s) => !mentionedPathSet.has(s.filePath)
+						);
+						const autoContext =
+							this.contextProvider.formatContextForPrompt(
+								filteredSnippets
+							);
+						if (autoContext) {
+							contextPrompt += autoContext;
+						}
+					}
+				} else {
+					// Use keyword-based search
+					const snippets = await this.contextProvider.gatherContext(
+						displayQuery
 					);
-				if (autoContext) {
-					contextPrompt += autoContext;
+					const mentionedPathSet = new Set(mentionedPaths);
+					const filteredSnippets = snippets.filter(
+						(s) => !mentionedPathSet.has(s.filePath)
+					);
+
+					const autoContext =
+						this.contextProvider.formatContextForPrompt(
+							filteredSnippets
+						);
+					if (autoContext) {
+						contextPrompt += autoContext;
+					}
 				}
 			}
 

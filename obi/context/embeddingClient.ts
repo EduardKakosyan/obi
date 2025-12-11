@@ -1,0 +1,155 @@
+import { requestUrl } from "obsidian";
+
+export interface EmbeddingClientConfig {
+	endpoint: string;
+	model: string;
+	timeout?: number;
+}
+
+export class EmbeddingClientError extends Error {
+	constructor(
+		message: string,
+		public statusCode?: number,
+		public responseBody?: string
+	) {
+		super(message);
+		this.name = "EmbeddingClientError";
+	}
+}
+
+/**
+ * Client for generating embeddings via Ollama's API
+ */
+export class EmbeddingClient {
+	private config: EmbeddingClientConfig;
+
+	constructor(config: EmbeddingClientConfig) {
+		this.config = {
+			timeout: 30000, // 30 second default timeout
+			...config,
+		};
+	}
+
+	/**
+	 * Generate embedding for a single text
+	 */
+	async embed(text: string): Promise<number[]> {
+		const embeddings = await this.embedBatch([text]);
+		return embeddings[0];
+	}
+
+	/**
+	 * Generate embeddings for multiple texts in batch
+	 */
+	async embedBatch(texts: string[]): Promise<number[][]> {
+		const embeddings: number[][] = [];
+
+		// Ollama processes one at a time, so we batch sequentially
+		// but could parallelize with Promise.all for speed
+		for (const text of texts) {
+			const embedding = await this.embedSingle(text);
+			embeddings.push(embedding);
+		}
+
+		return embeddings;
+	}
+
+	/**
+	 * Generate embedding for a single text via Ollama API
+	 */
+	private async embedSingle(text: string): Promise<number[]> {
+		const url = `${this.config.endpoint}/api/embeddings`;
+
+		try {
+			const response = await requestUrl({
+				url,
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					model: this.config.model,
+					prompt: text,
+				}),
+				throw: false,
+			});
+
+			if (response.status !== 200) {
+				throw new EmbeddingClientError(
+					`Ollama API error: ${response.status}`,
+					response.status,
+					response.text
+				);
+			}
+
+			const data = response.json;
+
+			if (!data.embedding || !Array.isArray(data.embedding)) {
+				throw new EmbeddingClientError(
+					"Invalid embedding response from Ollama"
+				);
+			}
+
+			return data.embedding;
+		} catch (error) {
+			if (error instanceof EmbeddingClientError) {
+				throw error;
+			}
+
+			if (error instanceof Error) {
+				throw new EmbeddingClientError(
+					`Embedding request failed: ${error.message}`
+				);
+			}
+
+			throw new EmbeddingClientError("Unknown error during embedding");
+		}
+	}
+
+	/**
+	 * Update client configuration
+	 */
+	updateConfig(config: Partial<EmbeddingClientConfig>) {
+		this.config = { ...this.config, ...config };
+	}
+
+	/**
+	 * Test connection to Ollama
+	 */
+	async testConnection(): Promise<boolean> {
+		try {
+			console.log(
+				`[Obi] Testing Ollama at ${this.config.endpoint} with model ${this.config.model}`
+			);
+			const embedding = await this.embed("test");
+			console.log(
+				`[Obi] Ollama test successful, embedding dimension: ${embedding.length}`
+			);
+			return embedding.length > 0;
+		} catch (e) {
+			console.error("[Obi] Ollama test failed:", e);
+			return false;
+		}
+	}
+
+	/**
+	 * Get the embedding dimension (useful for vector DB setup)
+	 */
+	async getEmbeddingDimension(): Promise<number> {
+		const embedding = await this.embed("test");
+		return embedding.length;
+	}
+}
+
+/**
+ * Create an EmbeddingClient from plugin settings
+ */
+export function createEmbeddingClient(settings: {
+	embeddingEndpoint: string;
+	embeddingModel: string;
+}): EmbeddingClient {
+	return new EmbeddingClient({
+		endpoint: settings.embeddingEndpoint,
+		model: settings.embeddingModel,
+	});
+}

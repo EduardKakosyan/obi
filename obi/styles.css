@@ -414,3 +414,199 @@
 	width: 12px;
 	height: 12px;
 }
+
+/* Index Status Modal */
+.obi-index-status-modal {
+	max-width: 600px;
+}
+
+.obi-index-status-modal h2 {
+	margin: 0 0 16px 0;
+}
+
+.obi-index-stats {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.obi-stat-card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 12px;
+	background: var(--background-secondary);
+	border-radius: 8px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.obi-stat-icon {
+	margin-bottom: 4px;
+	opacity: 0.8;
+}
+
+.obi-stat-icon svg {
+	width: 20px;
+	height: 20px;
+}
+
+.obi-stat-indexed .obi-stat-icon {
+	color: var(--color-green);
+}
+
+.obi-stat-changed .obi-stat-icon {
+	color: var(--color-yellow);
+}
+
+.obi-stat-new .obi-stat-icon {
+	color: var(--color-blue);
+}
+
+.obi-stat-vectors .obi-stat-icon {
+	color: var(--text-muted);
+}
+
+.obi-stat-value {
+	font-size: 24px;
+	font-weight: 700;
+	line-height: 1;
+	margin-bottom: 4px;
+}
+
+.obi-stat-label {
+	font-size: 11px;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.obi-last-index {
+	margin-bottom: 16px;
+	padding: 8px 12px;
+	background: var(--background-secondary);
+	border-radius: 6px;
+	font-size: 12px;
+	color: var(--text-muted);
+}
+
+.obi-index-tabs {
+	display: flex;
+	gap: 4px;
+	margin-bottom: 12px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.obi-tab {
+	padding: 6px 12px;
+	background: transparent;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	cursor: pointer;
+	font-size: 12px;
+	color: var(--text-muted);
+	transition: all 0.15s ease;
+}
+
+.obi-tab:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.obi-tab.active {
+	background: var(--interactive-accent);
+	border-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.obi-file-list-container {
+	max-height: 400px;
+	overflow-y: auto;
+}
+
+.obi-file-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.obi-file-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 12px;
+	border-radius: 6px;
+	transition: background 0.1s ease;
+}
+
+.obi-file-item:hover {
+	background: var(--background-modifier-hover);
+}
+
+.obi-file-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.obi-file-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.obi-file-indexed .obi-file-icon {
+	color: var(--color-green);
+}
+
+.obi-file-changed .obi-file-icon {
+	color: var(--color-yellow);
+}
+
+.obi-file-new .obi-file-icon {
+	color: var(--color-blue);
+}
+
+.obi-file-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.obi-file-path {
+	font-size: 13px;
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.obi-file-meta {
+	font-size: 11px;
+	color: var(--text-muted);
+	margin-top: 2px;
+}
+
+.obi-no-files {
+	padding: 24px;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+/* File list scrollbar */
+.obi-file-list-container::-webkit-scrollbar {
+	width: 6px;
+}
+
+.obi-file-list-container::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.obi-file-list-container::-webkit-scrollbar-thumb {
+	background: var(--background-modifier-border);
+	border-radius: 3px;
+}
+
+.obi-file-list-container::-webkit-scrollbar-thumb:hover {
+	background: var(--text-muted);
+}

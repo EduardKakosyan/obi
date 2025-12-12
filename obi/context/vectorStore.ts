@@ -17,10 +17,7 @@ export interface SearchResult {
 }
 
 export class VectorStoreError extends Error {
-	constructor(
-		message: string,
-		public statusCode?: number
-	) {
+	constructor(message: string, public statusCode?: number) {
 		super(message);
 		this.name = "VectorStoreError";
 	}
@@ -42,10 +39,17 @@ export class VectorStore {
 	}
 
 	/**
-	 * Get the base URL for collection operations
+	 * Get the base URL for listing/creating collections
 	 */
 	private getCollectionsUrl(): string {
 		return `${this.config.endpoint}/api/v2/tenants/${this.config.tenant}/databases/${this.config.database}/collections`;
+	}
+
+	/**
+	 * Get the URL for operations on a specific collection
+	 */
+	private getCollectionUrl(): string {
+		return `${this.config.endpoint}/api/v2/tenants/${this.config.tenant}/databases/${this.config.database}/collections/${this.collectionId}`;
 	}
 
 	/**
@@ -75,7 +79,10 @@ export class VectorStore {
 	/**
 	 * Get collection info by name
 	 */
-	private async getCollection(): Promise<{ id: string; name: string } | null> {
+	private async getCollection(): Promise<{
+		id: string;
+		name: string;
+	} | null> {
 		try {
 			// List all collections and find by name
 			const response = await requestUrl({
@@ -131,6 +138,7 @@ export class VectorStore {
 
 	/**
 	 * Add or update documents with their embeddings
+	 * Uses /add endpoint (ChromaDB v2 doesn't have upsert, so we delete first then add)
 	 */
 	async upsert(
 		chunks: DocumentChunk[],
@@ -148,8 +156,20 @@ export class VectorStore {
 
 		if (chunks.length === 0) return;
 
+		// First, try to delete existing documents with these IDs (ignore errors)
+		await requestUrl({
+			url: `${this.getCollectionUrl()}/delete`,
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				ids: chunks.map((c) => c.id),
+			}),
+			throw: false,
+		});
+
+		// Then add the new documents
 		const response = await requestUrl({
-			url: `${this.config.endpoint}/api/v2/collections/${this.collectionId}/upsert`,
+			url: `${this.getCollectionUrl()}/add`,
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -168,7 +188,7 @@ export class VectorStore {
 
 		if (response.status !== 200 && response.status !== 201) {
 			throw new VectorStoreError(
-				`Failed to upsert documents: ${response.status} - ${response.text}`,
+				`Failed to add documents: ${response.status} - ${response.text}`,
 				response.status
 			);
 		}
@@ -186,7 +206,7 @@ export class VectorStore {
 		}
 
 		const response = await requestUrl({
-			url: `${this.config.endpoint}/api/v2/collections/${this.collectionId}/query`,
+			url: `${this.getCollectionUrl()}/query`,
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -240,7 +260,7 @@ export class VectorStore {
 		}
 
 		const response = await requestUrl({
-			url: `${this.config.endpoint}/api/v2/collections/${this.collectionId}/delete`,
+			url: `${this.getCollectionUrl()}/delete`,
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -262,7 +282,7 @@ export class VectorStore {
 		// Delete and recreate collection
 		if (this.collectionId) {
 			await requestUrl({
-				url: `${this.config.endpoint}/api/v2/collections/${this.collectionId}`,
+				url: `${this.getCollectionUrl()}`,
 				method: "DELETE",
 				throw: false,
 			});
@@ -280,7 +300,7 @@ export class VectorStore {
 		}
 
 		const response = await requestUrl({
-			url: `${this.config.endpoint}/api/v2/collections/${this.collectionId}/count`,
+			url: `${this.getCollectionUrl()}/count`,
 			method: "GET",
 			throw: false,
 		});

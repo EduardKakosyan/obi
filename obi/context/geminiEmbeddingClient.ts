@@ -5,6 +5,12 @@ export interface GeminiEmbeddingClientConfig {
 	apiKey: string;
 	model: string;
 	timeout?: number;
+	/**
+	 * Output embedding dimension. Can only TRUNCATE to smaller dimensions.
+	 * gemini-embedding-001 outputs 768 dimensions natively.
+	 * Leave undefined to use native dimension.
+	 */
+	outputDimensionality?: number;
 }
 
 interface GeminiEmbeddingResponse {
@@ -33,7 +39,10 @@ interface GeminiBatchEmbeddingResponse {
  * Client for generating embeddings via Google's Gemini API
  *
  * Gemini embedding models:
- * - gemini-embedding-001 (up to 3072 dimensions, recommended)
+ * - gemini-embedding-001: outputs 768 dimensions natively
+ *
+ * Note: outputDimensionality can only TRUNCATE embeddings to smaller dimensions,
+ * not expand them. If not specified, uses the model's native dimension (768).
  */
 export class GeminiEmbeddingClient implements IEmbeddingClient {
 	private config: GeminiEmbeddingClientConfig;
@@ -43,6 +52,7 @@ export class GeminiEmbeddingClient implements IEmbeddingClient {
 	constructor(config: GeminiEmbeddingClientConfig) {
 		this.config = {
 			timeout: 30000, // 30 second default timeout
+			// Don't set outputDimensionality by default - use native 768 dimensions
 			...config,
 			// Use provided model or default to gemini-embedding-001
 			model: config.model || "gemini-embedding-001",
@@ -56,19 +66,27 @@ export class GeminiEmbeddingClient implements IEmbeddingClient {
 		const url = `${this.baseUrl}/models/${this.config.model}:embedContent?key=${this.config.apiKey}`;
 
 		try {
+			const requestBody: Record<string, unknown> = {
+				model: `models/${this.config.model}`,
+				content: {
+					parts: [{ text }],
+				},
+				taskType: "RETRIEVAL_DOCUMENT",
+			};
+
+			// Add output dimensionality if configured
+			if (this.config.outputDimensionality) {
+				requestBody.outputDimensionality =
+					this.config.outputDimensionality;
+			}
+
 			const response = await requestUrl({
 				url,
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({
-					model: `models/${this.config.model}`,
-					content: {
-						parts: [{ text }],
-					},
-					taskType: "RETRIEVAL_DOCUMENT",
-				}),
+				body: JSON.stringify(requestBody),
 				throw: false,
 			});
 
@@ -138,13 +156,19 @@ export class GeminiEmbeddingClient implements IEmbeddingClient {
 		const url = `${this.baseUrl}/models/${this.config.model}:batchEmbedContents?key=${this.config.apiKey}`;
 
 		try {
-			const requests = texts.map((text) => ({
-				model: `models/${this.config.model}`,
-				content: {
-					parts: [{ text }],
-				},
-				taskType: "RETRIEVAL_DOCUMENT",
-			}));
+			const requests = texts.map((text) => {
+				const req: Record<string, unknown> = {
+					model: `models/${this.config.model}`,
+					content: {
+						parts: [{ text }],
+					},
+					taskType: "RETRIEVAL_DOCUMENT",
+				};
+				if (this.config.outputDimensionality) {
+					req.outputDimensionality = this.config.outputDimensionality;
+				}
+				return req;
+			});
 
 			const response = await requestUrl({
 				url,
@@ -250,6 +274,7 @@ export class GeminiEmbeddingClient implements IEmbeddingClient {
 
 /**
  * Create a GeminiEmbeddingClient from plugin settings
+ * Note: Uses native embedding dimension (768 for gemini-embedding-001)
  */
 export function createGeminiEmbeddingClient(settings: {
 	geminiApiKey: string;
@@ -258,5 +283,6 @@ export function createGeminiEmbeddingClient(settings: {
 	return new GeminiEmbeddingClient({
 		apiKey: settings.geminiApiKey,
 		model: settings.geminiEmbeddingModel,
+		// Don't pass outputDimensionality - use native 768 dimensions
 	});
 }

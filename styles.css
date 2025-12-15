@@ -75,7 +75,6 @@
 	padding: 10px 14px;
 	border-radius: 12px;
 	word-wrap: break-word;
-	white-space: pre-wrap;
 }
 
 .obi-message-user {
@@ -83,6 +82,7 @@
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);
 	border-bottom-right-radius: 4px;
+	white-space: pre-wrap;
 }
 
 .obi-message-assistant {
@@ -101,6 +101,183 @@
 
 .obi-message-content {
 	line-height: 1.5;
+}
+
+/* Markdown rendering in assistant messages */
+.obi-message-assistant .obi-message-content {
+	white-space: normal;
+}
+
+.obi-message-assistant .obi-message-content p {
+	margin: 0 0 0.75em 0;
+}
+
+.obi-message-assistant .obi-message-content p:last-child {
+	margin-bottom: 0;
+}
+
+.obi-message-assistant .obi-message-content h1,
+.obi-message-assistant .obi-message-content h2,
+.obi-message-assistant .obi-message-content h3,
+.obi-message-assistant .obi-message-content h4,
+.obi-message-assistant .obi-message-content h5,
+.obi-message-assistant .obi-message-content h6 {
+	margin: 1em 0 0.5em 0;
+	line-height: 1.3;
+	font-weight: 600;
+}
+
+.obi-message-assistant .obi-message-content h1:first-child,
+.obi-message-assistant .obi-message-content h2:first-child,
+.obi-message-assistant .obi-message-content h3:first-child,
+.obi-message-assistant .obi-message-content h4:first-child,
+.obi-message-assistant .obi-message-content h5:first-child,
+.obi-message-assistant .obi-message-content h6:first-child {
+	margin-top: 0;
+}
+
+.obi-message-assistant .obi-message-content h1 {
+	font-size: 1.4em;
+}
+
+.obi-message-assistant .obi-message-content h2 {
+	font-size: 1.25em;
+}
+
+.obi-message-assistant .obi-message-content h3 {
+	font-size: 1.1em;
+}
+
+.obi-message-assistant .obi-message-content h4,
+.obi-message-assistant .obi-message-content h5,
+.obi-message-assistant .obi-message-content h6 {
+	font-size: 1em;
+}
+
+/* Lists */
+.obi-message-assistant .obi-message-content ul,
+.obi-message-assistant .obi-message-content ol {
+	margin: 0.5em 0;
+	padding-left: 1.5em;
+}
+
+.obi-message-assistant .obi-message-content li {
+	margin: 0.25em 0;
+}
+
+.obi-message-assistant .obi-message-content li > ul,
+.obi-message-assistant .obi-message-content li > ol {
+	margin: 0.25em 0;
+}
+
+/* Inline code */
+.obi-message-assistant .obi-message-content code {
+	font-family: var(--font-monospace);
+	font-size: 0.9em;
+	background: var(--background-primary-alt);
+	padding: 0.15em 0.4em;
+	border-radius: 4px;
+	color: var(--text-normal);
+}
+
+/* Code blocks */
+.obi-message-assistant .obi-message-content pre {
+	margin: 0.75em 0;
+	padding: 12px 14px;
+	background: var(--background-primary);
+	border-radius: 8px;
+	overflow-x: auto;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.obi-message-assistant .obi-message-content pre code {
+	background: none;
+	padding: 0;
+	font-size: 0.85em;
+	line-height: 1.5;
+	color: var(--text-normal);
+}
+
+/* Blockquotes */
+.obi-message-assistant .obi-message-content blockquote {
+	margin: 0.75em 0;
+	padding: 0.5em 1em;
+	border-left: 3px solid var(--interactive-accent);
+	background: var(--background-primary-alt);
+	border-radius: 0 4px 4px 0;
+	color: var(--text-muted);
+}
+
+.obi-message-assistant .obi-message-content blockquote p {
+	margin: 0;
+}
+
+/* Links */
+.obi-message-assistant .obi-message-content a {
+	color: var(--interactive-accent);
+	text-decoration: none;
+}
+
+.obi-message-assistant .obi-message-content a:hover {
+	text-decoration: underline;
+}
+
+/* Internal links */
+.obi-message-assistant .obi-message-content a.internal-link {
+	color: var(--link-color);
+}
+
+/* Tables */
+.obi-message-assistant .obi-message-content table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 0.75em 0;
+	font-size: 0.9em;
+}
+
+.obi-message-assistant .obi-message-content th,
+.obi-message-assistant .obi-message-content td {
+	padding: 8px 12px;
+	text-align: left;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.obi-message-assistant .obi-message-content th {
+	background: var(--background-primary-alt);
+	font-weight: 600;
+}
+
+.obi-message-assistant .obi-message-content tr:nth-child(even) {
+	background: var(--background-primary-alt);
+}
+
+/* Horizontal rule */
+.obi-message-assistant .obi-message-content hr {
+	margin: 1em 0;
+	border: none;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Strong and emphasis */
+.obi-message-assistant .obi-message-content strong {
+	font-weight: 600;
+}
+
+.obi-message-assistant .obi-message-content em {
+	font-style: italic;
+}
+
+/* Task lists */
+.obi-message-assistant .obi-message-content input[type="checkbox"] {
+	margin-right: 0.5em;
+	vertical-align: middle;
+}
+
+/* Images */
+.obi-message-assistant .obi-message-content img {
+	max-width: 100%;
+	border-radius: 4px;
+	margin: 0.5em 0;
 }
 
 .obi-input-container {
@@ -619,3 +796,20 @@
 .obi-file-list-container::-webkit-scrollbar-thumb:hover {
 	background: var(--text-muted);
 }
+
+/* Settings warning */
+.obi-setting-warning {
+	margin: 8px 0 16px 0;
+	padding: 12px;
+	background: rgba(var(--color-yellow-rgb), 0.1);
+	border: 1px solid var(--color-yellow);
+	border-radius: 6px;
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.obi-setting-warning p {
+	margin: 0;
+	color: var(--text-normal);
+}
+

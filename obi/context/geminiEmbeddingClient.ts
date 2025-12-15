@@ -33,8 +33,7 @@ interface GeminiBatchEmbeddingResponse {
  * Client for generating embeddings via Google's Gemini API
  *
  * Gemini embedding models:
- * - text-embedding-004 (768 dimensions, recommended)
- * - embedding-001 (768 dimensions)
+ * - gemini-embedding-001 (up to 3072 dimensions, recommended)
  */
 export class GeminiEmbeddingClient implements IEmbeddingClient {
 	private config: GeminiEmbeddingClientConfig;
@@ -45,8 +44,8 @@ export class GeminiEmbeddingClient implements IEmbeddingClient {
 		this.config = {
 			timeout: 30000, // 30 second default timeout
 			...config,
-			// Use provided model or default to text-embedding-004
-			model: config.model || "text-embedding-004",
+			// Use provided model or default to gemini-embedding-001
+			model: config.model || "gemini-embedding-001",
 		};
 	}
 
@@ -76,7 +75,9 @@ export class GeminiEmbeddingClient implements IEmbeddingClient {
 			if (response.status !== 200) {
 				const errorData = response.json as GeminiEmbeddingResponse;
 				const errorMessage =
-					errorData?.error?.message || response.text || "Unknown error";
+					errorData?.error?.message ||
+					response.text ||
+					"Unknown error";
 				throw new EmbeddingClientError(
 					`Gemini Embedding API error: ${errorMessage}`,
 					response.status,
@@ -86,7 +87,10 @@ export class GeminiEmbeddingClient implements IEmbeddingClient {
 
 			const data: GeminiEmbeddingResponse = response.json;
 
-			if (!data.embedding?.values || !Array.isArray(data.embedding.values)) {
+			if (
+				!data.embedding?.values ||
+				!Array.isArray(data.embedding.values)
+			) {
 				throw new EmbeddingClientError(
 					"Invalid embedding response from Gemini"
 				);
@@ -155,7 +159,9 @@ export class GeminiEmbeddingClient implements IEmbeddingClient {
 			if (response.status !== 200) {
 				const errorData = response.json as GeminiBatchEmbeddingResponse;
 				const errorMessage =
-					errorData?.error?.message || response.text || "Unknown error";
+					errorData?.error?.message ||
+					response.text ||
+					"Unknown error";
 				throw new EmbeddingClientError(
 					`Gemini Batch Embedding API error: ${errorMessage}`,
 					response.status,
@@ -254,4 +260,3 @@ export function createGeminiEmbeddingClient(settings: {
 		model: settings.geminiEmbeddingModel,
 	});
 }
-

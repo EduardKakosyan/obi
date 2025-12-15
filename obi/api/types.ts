@@ -84,3 +84,4 @@ export class EmbeddingClientError extends Error {
 	}
 }
 
+

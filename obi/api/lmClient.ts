@@ -72,7 +72,9 @@ export class LocalLMClient implements ILMClient {
 			const data: LMStudioResponse = await response.json();
 
 			if (!data.choices || data.choices.length === 0) {
-				throw new LLMClientError("No response choices returned from LM Studio");
+				throw new LLMClientError(
+					"No response choices returned from LM Studio"
+				);
 			}
 
 			return data.choices[0].message;

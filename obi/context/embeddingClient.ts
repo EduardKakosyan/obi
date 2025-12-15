@@ -1,29 +1,22 @@
 import { requestUrl } from "obsidian";
+import { IEmbeddingClient, EmbeddingClientError } from "../api/types";
 
-export interface EmbeddingClientConfig {
+export interface LocalEmbeddingClientConfig {
 	endpoint: string;
 	model: string;
 	timeout?: number;
 }
 
-export class EmbeddingClientError extends Error {
-	constructor(
-		message: string,
-		public statusCode?: number,
-		public responseBody?: string
-	) {
-		super(message);
-		this.name = "EmbeddingClientError";
-	}
-}
+// Re-export for backwards compatibility
+export { EmbeddingClientError } from "../api/types";
 
 /**
  * Client for generating embeddings via Ollama's API
  */
-export class EmbeddingClient {
-	private config: EmbeddingClientConfig;
+export class LocalEmbeddingClient implements IEmbeddingClient {
+	private config: LocalEmbeddingClientConfig;
 
-	constructor(config: EmbeddingClientConfig) {
+	constructor(config: LocalEmbeddingClientConfig) {
 		this.config = {
 			timeout: 30000, // 30 second default timeout
 			...config,
@@ -109,7 +102,7 @@ export class EmbeddingClient {
 	/**
 	 * Update client configuration
 	 */
-	updateConfig(config: Partial<EmbeddingClientConfig>) {
+	updateConfig(config: Partial<LocalEmbeddingClientConfig>) {
 		this.config = { ...this.config, ...config };
 	}
 
@@ -142,13 +135,31 @@ export class EmbeddingClient {
 }
 
 /**
- * Create an EmbeddingClient from plugin settings
+ * Backwards compatibility alias
+ */
+export const EmbeddingClient = LocalEmbeddingClient;
+
+/**
+ * Create a LocalEmbeddingClient from plugin settings
  */
 export function createEmbeddingClient(settings: {
 	embeddingEndpoint: string;
 	embeddingModel: string;
-}): EmbeddingClient {
-	return new EmbeddingClient({
+}): LocalEmbeddingClient {
+	return new LocalEmbeddingClient({
+		endpoint: settings.embeddingEndpoint,
+		model: settings.embeddingModel,
+	});
+}
+
+/**
+ * Create a LocalEmbeddingClient from plugin settings (explicit name)
+ */
+export function createLocalEmbeddingClient(settings: {
+	embeddingEndpoint: string;
+	embeddingModel: string;
+}): LocalEmbeddingClient {
+	return new LocalEmbeddingClient({
 		endpoint: settings.embeddingEndpoint,
 		model: settings.embeddingModel,
 	});

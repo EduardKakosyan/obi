@@ -1,30 +1,23 @@
 import { ChatMessage, LMStudioResponse } from "../types";
+import { ILMClient, LLMClientError } from "./types";
 
-export interface LMClientConfig {
+export interface LocalLMClientConfig {
 	endpoint: string;
 	model: string;
 	apiKey?: string;
 	timeout?: number;
 }
 
-export class LMClientError extends Error {
-	constructor(
-		message: string,
-		public statusCode?: number,
-		public responseBody?: string
-	) {
-		super(message);
-		this.name = "LMClientError";
-	}
-}
+// Re-export for backwards compatibility
+export { LLMClientError as LMClientError } from "./types";
 
 /**
  * Client for communicating with LM Studio's OpenAI-compatible API
  */
-export class LMClient {
-	private config: LMClientConfig;
+export class LocalLMClient implements ILMClient {
+	private config: LocalLMClientConfig;
 
-	constructor(config: LMClientConfig) {
+	constructor(config: LocalLMClientConfig) {
 		this.config = {
 			timeout: 60000, // 60 second default timeout
 			...config,
@@ -69,7 +62,7 @@ export class LMClient {
 
 			if (!response.ok) {
 				const responseBody = await response.text();
-				throw new LMClientError(
+				throw new LLMClientError(
 					`LM Studio API error: ${response.status} ${response.statusText}`,
 					response.status,
 					responseBody
@@ -79,34 +72,34 @@ export class LMClient {
 			const data: LMStudioResponse = await response.json();
 
 			if (!data.choices || data.choices.length === 0) {
-				throw new LMClientError("No response choices returned from LM Studio");
+				throw new LLMClientError("No response choices returned from LM Studio");
 			}
 
 			return data.choices[0].message;
 		} catch (error) {
 			clearTimeout(timeoutId);
 
-			if (error instanceof LMClientError) {
+			if (error instanceof LLMClientError) {
 				throw error;
 			}
 
 			if (error instanceof Error) {
 				if (error.name === "AbortError") {
-					throw new LMClientError(
+					throw new LLMClientError(
 						`Request timed out after ${this.config.timeout}ms`
 					);
 				}
-				throw new LMClientError(`Network error: ${error.message}`);
+				throw new LLMClientError(`Network error: ${error.message}`);
 			}
 
-			throw new LMClientError("Unknown error occurred");
+			throw new LLMClientError("Unknown error occurred");
 		}
 	}
 
 	/**
 	 * Update the client configuration
 	 */
-	updateConfig(config: Partial<LMClientConfig>) {
+	updateConfig(config: Partial<LocalLMClientConfig>) {
 		this.config = { ...this.config, ...config };
 	}
 
@@ -126,17 +119,36 @@ export class LMClient {
 }
 
 /**
- * Create an LMClient instance from plugin settings
+ * Backwards compatibility alias
+ */
+export const LMClient = LocalLMClient;
+
+/**
+ * Create a LocalLMClient instance from plugin settings
  */
 export function createLMClient(settings: {
 	endpoint: string;
 	model: string;
 	apiKey: string;
-}): LMClient {
-	return new LMClient({
+}): LocalLMClient {
+	return new LocalLMClient({
 		endpoint: settings.endpoint,
 		model: settings.model,
 		apiKey: settings.apiKey || undefined,
 	});
 }
 
+/**
+ * Create a LocalLMClient instance from plugin settings (explicit name)
+ */
+export function createLocalLMClient(settings: {
+	endpoint: string;
+	model: string;
+	apiKey: string;
+}): LocalLMClient {
+	return new LocalLMClient({
+		endpoint: settings.endpoint,
+		model: settings.model,
+		apiKey: settings.apiKey || undefined,
+	});
+}

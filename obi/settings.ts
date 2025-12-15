@@ -76,8 +76,8 @@ export const DEFAULT_SETTINGS: ObiSettings = {
 
 	// Gemini
 	geminiApiKey: "",
-	geminiModel: "gemini-2.0-flash",
-	geminiEmbeddingModel: "text-embedding-004",
+	geminiModel: "gemini-3.0-flash",
+	geminiEmbeddingModel: "gemini-embedding-001",
 
 	// Context
 	maxContextFiles: 5,
@@ -188,11 +188,11 @@ export class ObiSettingTab extends PluginSettingTab {
 				new Setting(containerEl)
 					.setName("Gemini chat model")
 					.setDesc(
-						"The Gemini model to use for chat (e.g., gemini-2.0-flash, gemini-1.5-pro)."
+						"The Gemini model to use for chat (e.g., gemini-3.0-flash, gemini-3.0-pro)."
 					)
 					.addText((text) =>
 						text
-							.setPlaceholder("gemini-2.0-flash")
+							.setPlaceholder("gemini-3.0-flash")
 							.setValue(this.plugin.settings.geminiModel)
 							.onChange(async (value) => {
 								this.plugin.settings.geminiModel = value;

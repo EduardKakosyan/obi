@@ -274,7 +274,32 @@ export default class ObiPlugin extends Plugin {
 			console.log("[Obi] Semantic search initialized successfully");
 		} catch (e) {
 			console.error("[Obi] Failed to initialize semantic search:", e);
-			new Notice(`Obi: Failed to initialize semantic search: ${e}`, 5000);
+
+			// Provide clearer error messages
+			let errorMsg = "Failed to initialize semantic search";
+			const errorStr = String(e);
+
+			if (
+				errorStr.includes("ERR_CONNECTION_REFUSED") ||
+				errorStr.includes("ECONNREFUSED")
+			) {
+				errorMsg =
+					"ChromaDB server not running. Start ChromaDB or disable semantic search in settings.";
+			} else if (
+				errorStr.includes("401") ||
+				errorStr.includes("403") ||
+				errorStr.includes("API key")
+			) {
+				errorMsg =
+					"Invalid API key. Check your Gemini API key in settings.";
+			} else if (errorStr.includes("404")) {
+				errorMsg =
+					"Model not found. Check your model name in settings.";
+			} else {
+				errorMsg = `${errorMsg}: ${e}`;
+			}
+
+			new Notice(`Obi: ${errorMsg}`, 7000);
 		}
 	}
 

@@ -327,6 +327,7 @@ export default class ObiPlugin extends Plugin {
 				this.embeddingClient.updateConfig({
 					apiKey: this.settings.geminiApiKey,
 					model: this.settings.geminiEmbeddingModel,
+					// Use native dimension (768 for gemini-embedding-001)
 				});
 			} else {
 				this.embeddingClient.updateConfig({

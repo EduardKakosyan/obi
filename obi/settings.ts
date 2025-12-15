@@ -24,6 +24,8 @@ export interface ObiSettings {
 	geminiModel: string;
 	/** Gemini model for embeddings */
 	geminiEmbeddingModel: string;
+	/** Gemini embedding output dimension */
+	geminiEmbeddingDimension: number;
 
 	// Context Settings
 	/** Maximum number of context files to include */
@@ -76,8 +78,9 @@ export const DEFAULT_SETTINGS: ObiSettings = {
 
 	// Gemini
 	geminiApiKey: "",
-	geminiModel: "gemini-3.0-flash",
+	geminiModel: "gemini-2.5-flash",
 	geminiEmbeddingModel: "gemini-embedding-001",
+	geminiEmbeddingDimension: 768, // Native dimension for gemini-embedding-001
 
 	// Context
 	maxContextFiles: 5,
@@ -205,11 +208,11 @@ export class ObiSettingTab extends PluginSettingTab {
 				new Setting(containerEl)
 					.setName("Gemini embedding model")
 					.setDesc(
-						"The Gemini model to use for embeddings (e.g., text-embedding-004)."
+						"The Gemini model to use for embeddings. Note: gemini-embedding-001 outputs 768 dimensions."
 					)
 					.addText((text) =>
 						text
-							.setPlaceholder("text-embedding-004")
+							.setPlaceholder("gemini-embedding-001")
 							.setValue(this.plugin.settings.geminiEmbeddingModel)
 							.onChange(async (value) => {
 								this.plugin.settings.geminiEmbeddingModel =
@@ -217,6 +220,14 @@ export class ObiSettingTab extends PluginSettingTab {
 								await this.plugin.saveSettings();
 							})
 					);
+
+				// Add warning about dimension mismatch
+				const warningEl = containerEl.createDiv({
+					cls: "obi-setting-warning",
+				});
+				warningEl.createEl("p", {
+					text: "⚠️ Gemini embeddings are 768 dimensions. If your existing ChromaDB collection uses different dimensions (e.g., 1024 from Ollama), you must use a different collection name or delete the old collection.",
+				});
 			}
 
 			new Setting(containerEl)

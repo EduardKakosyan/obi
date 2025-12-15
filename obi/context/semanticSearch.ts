@@ -156,7 +156,8 @@ export class SemanticSearch {
 
 			if (totalTokens + tokenCount > this.config.maxContextTokens) {
 				// Truncate content to fit
-				const remainingTokens = this.config.maxContextTokens - totalTokens;
+				const remainingTokens =
+					this.config.maxContextTokens - totalTokens;
 				if (remainingTokens > 100) {
 					const truncatedContent = result.content.slice(
 						0,
@@ -259,6 +260,3 @@ export function createSemanticSearch(
 		config
 	);
 }
-
-
-

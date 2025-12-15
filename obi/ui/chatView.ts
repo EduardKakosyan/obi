@@ -1,4 +1,11 @@
-import { ItemView, WorkspaceLeaf, setIcon, TFile, requestUrl } from "obsidian";
+import {
+	ItemView,
+	WorkspaceLeaf,
+	setIcon,
+	TFile,
+	requestUrl,
+	MarkdownRenderer,
+} from "obsidian";
 import type ObiPlugin from "../main";
 import { ChatMessage } from "../types";
 import { ILMClient, LLMClientError } from "../api/types";
@@ -672,7 +679,7 @@ export class ObiChatView extends ItemView {
 		if (welcome) welcome.remove();
 
 		// Add user message (cleaned for display)
-		this.addMessage(
+		await this.addMessage(
 			{ role: "user", content: displayQuery },
 			mentionedFiles
 		);
@@ -790,7 +797,7 @@ export class ObiChatView extends ItemView {
 			const response = await lmClient.chat(apiMessages);
 
 			// Add assistant response
-			this.addMessage(response);
+			await this.addMessage(response);
 		} catch (error) {
 			let errorMessage =
 				"An error occurred while processing your request.";
@@ -845,7 +852,7 @@ export class ObiChatView extends ItemView {
 		return parts.join("\n");
 	}
 
-	private addMessage(message: ChatMessage, mentions?: MentionedFile[]) {
+	private async addMessage(message: ChatMessage, mentions?: MentionedFile[]) {
 		this.messages.push(message);
 
 		const messageEl = this.messagesContainer.createDiv({
@@ -853,7 +860,28 @@ export class ObiChatView extends ItemView {
 		});
 
 		const contentEl = messageEl.createDiv({ cls: "obi-message-content" });
-		contentEl.setText(message.content);
+
+		// Render markdown for assistant messages, plain text for user messages
+		if (message.role === "assistant") {
+			try {
+				await MarkdownRenderer.render(
+					this.plugin.app,
+					message.content,
+					contentEl,
+					"",
+					this
+				);
+			} catch (e) {
+				// Fallback to plain text if markdown rendering fails
+				console.warn(
+					"[Obi] Markdown rendering failed, using plain text:",
+					e
+				);
+				contentEl.setText(message.content);
+			}
+		} else {
+			contentEl.setText(message.content);
+		}
 
 		// Show mentioned files as chips for user messages
 		if (message.role === "user" && mentions && mentions.length > 0) {

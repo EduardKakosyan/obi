@@ -83,5 +83,3 @@ export class EmbeddingClientError extends Error {
 		this.name = "EmbeddingClientError";
 	}
 }
-
-

@@ -117,7 +117,9 @@ export class GeminiLMClient implements ILMClient {
 			if (response.status !== 200) {
 				const errorData = response.json as GeminiResponse;
 				const errorMessage =
-					errorData?.error?.message || response.text || "Unknown error";
+					errorData?.error?.message ||
+					response.text ||
+					"Unknown error";
 				throw new LLMClientError(
 					`Gemini API error: ${errorMessage}`,
 					response.status,
@@ -128,11 +130,16 @@ export class GeminiLMClient implements ILMClient {
 			const data: GeminiResponse = response.json;
 
 			if (!data.candidates || data.candidates.length === 0) {
-				throw new LLMClientError("No response candidates returned from Gemini");
+				throw new LLMClientError(
+					"No response candidates returned from Gemini"
+				);
 			}
 
 			const candidate = data.candidates[0];
-			if (!candidate.content?.parts || candidate.content.parts.length === 0) {
+			if (
+				!candidate.content?.parts ||
+				candidate.content.parts.length === 0
+			) {
 				throw new LLMClientError("Empty response from Gemini");
 			}
 
@@ -151,7 +158,9 @@ export class GeminiLMClient implements ILMClient {
 			}
 
 			if (error instanceof Error) {
-				throw new LLMClientError(`Gemini request failed: ${error.message}`);
+				throw new LLMClientError(
+					`Gemini request failed: ${error.message}`
+				);
 			}
 
 			throw new LLMClientError("Unknown error occurred");
@@ -193,5 +202,3 @@ export function createGeminiLMClient(settings: {
 		model: settings.geminiModel,
 	});
 }
-
-

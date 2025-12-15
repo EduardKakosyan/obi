@@ -2,10 +2,15 @@ import { Plugin, Notice } from "obsidian";
 import { ObiSettings, DEFAULT_SETTINGS, ObiSettingTab } from "./settings";
 import { OBI_VIEW_TYPE, ObiChatView } from "./ui/chatView";
 import { IndexStatusModal } from "./ui/indexStatusModal";
+import { IEmbeddingClient, ILMClient } from "./api/types";
 import {
-	EmbeddingClient,
-	createEmbeddingClient,
+	LocalEmbeddingClient,
+	createLocalEmbeddingClient,
 } from "./context/embeddingClient";
+import {
+	GeminiEmbeddingClient,
+	createGeminiEmbeddingClient,
+} from "./context/geminiEmbeddingClient";
 import { VectorStore, createVectorStore } from "./context/vectorStore";
 import {
 	DocumentChunker,
@@ -13,12 +18,17 @@ import {
 } from "./context/documentChunker";
 import { IndexManager, createIndexManager } from "./context/indexManager";
 import { SemanticSearch, createSemanticSearch } from "./context/semanticSearch";
+import { LocalLMClient, createLocalLMClient } from "./api/lmClient";
+import { GeminiLMClient, createGeminiLMClient } from "./api/geminiLmClient";
 
 export default class ObiPlugin extends Plugin {
 	settings: ObiSettings;
 
+	// LLM Client (exposed for chat view)
+	lmClient: ILMClient | null = null;
+
 	// Semantic search components (exposed for settings tab)
-	embeddingClient: EmbeddingClient | null = null;
+	embeddingClient: IEmbeddingClient | null = null;
 	vectorStore: VectorStore | null = null;
 	indexManager: IndexManager | null = null;
 	semanticSearch: SemanticSearch | null = null;
@@ -30,6 +40,9 @@ export default class ObiPlugin extends Plugin {
 
 		// Register the chat view
 		this.registerView(OBI_VIEW_TYPE, (leaf) => new ObiChatView(leaf, this));
+
+		// Initialize LLM client based on provider setting
+		this.initializeLMClient();
 
 		// Initialize semantic search after layout is ready (vault fully loaded)
 		this.app.workspace.onLayoutReady(async () => {
@@ -95,14 +108,74 @@ export default class ObiPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 
+		// Reinitialize LLM client if provider changed
+		this.initializeLMClient();
+
 		// Reinitialize semantic search if settings changed
 		if (this.settings.useSemanticSearch && !this.semanticSearch) {
 			await this.initializeSemanticSearch();
 		} else if (!this.settings.useSemanticSearch && this.semanticSearch) {
 			await this.shutdownSemanticSearch();
 		} else if (this.settings.useSemanticSearch) {
-			// Update existing components with new settings
-			this.updateSemanticSearchConfig();
+			// Check if embedding provider changed
+			const needsReinit = this.checkEmbeddingProviderChanged();
+			if (needsReinit) {
+				await this.shutdownSemanticSearch();
+				await this.initializeSemanticSearch();
+			} else {
+				// Update existing components with new settings
+				this.updateSemanticSearchConfig();
+			}
+		}
+	}
+
+	/**
+	 * Check if the embedding provider type has changed
+	 */
+	private checkEmbeddingProviderChanged(): boolean {
+		if (!this.embeddingClient) return true;
+
+		const isCurrentlyLocal =
+			this.embeddingClient instanceof LocalEmbeddingClient;
+		const shouldBeLocal = this.settings.embeddingProvider === "local";
+
+		return isCurrentlyLocal !== shouldBeLocal;
+	}
+
+	/**
+	 * Initialize the LLM client based on provider setting
+	 */
+	private initializeLMClient(): void {
+		if (this.settings.llmProvider === "gemini") {
+			if (!this.settings.geminiApiKey) {
+				console.warn("[Obi] Gemini API key not configured");
+				this.lmClient = null;
+				return;
+			}
+			this.lmClient = createGeminiLMClient(this.settings);
+			console.log("[Obi] Using Gemini LLM");
+		} else {
+			this.lmClient = createLocalLMClient(this.settings);
+			console.log("[Obi] Using Local LM Studio");
+		}
+	}
+
+	/**
+	 * Create the appropriate embedding client based on provider setting
+	 */
+	private createEmbeddingClient(): IEmbeddingClient | null {
+		if (this.settings.embeddingProvider === "gemini") {
+			if (!this.settings.geminiApiKey) {
+				console.warn(
+					"[Obi] Gemini API key not configured for embeddings"
+				);
+				return null;
+			}
+			console.log("[Obi] Using Gemini embeddings");
+			return createGeminiEmbeddingClient(this.settings);
+		} else {
+			console.log("[Obi] Using local Ollama embeddings");
+			return createLocalEmbeddingClient(this.settings);
 		}
 	}
 
@@ -113,8 +186,17 @@ export default class ObiPlugin extends Plugin {
 		console.log("[Obi] Initializing semantic search...");
 
 		try {
-			// Create components
-			this.embeddingClient = createEmbeddingClient(this.settings);
+			// Create embedding client based on provider
+			this.embeddingClient = this.createEmbeddingClient();
+			if (!this.embeddingClient) {
+				new Notice(
+					"Obi: Embedding client not configured. Check your API keys.",
+					5000
+				);
+				return;
+			}
+
+			// Create vector store and chunker
 			this.vectorStore = createVectorStore(this.settings);
 			this.chunker = createDocumentChunker({
 				targetChunkSize: this.settings.chunkSize,
@@ -143,11 +225,20 @@ export default class ObiPlugin extends Plugin {
 			// Initialize index manager (loads state, starts periodic indexing)
 			await this.indexManager.initialize();
 
-			// Test connections individually for better error reporting
-			console.log("[Obi] Testing Ollama connection...");
-			const ollamaOk = await this.embeddingClient.testConnection();
+			// Test connections
+			const providerName =
+				this.settings.embeddingProvider === "gemini"
+					? "Gemini"
+					: "Ollama";
+
 			console.log(
-				`[Obi] Ollama connection: ${ollamaOk ? "OK" : "FAILED"}`
+				`[Obi] Testing ${providerName} embedding connection...`
+			);
+			const embeddingOk = await this.embeddingClient.testConnection();
+			console.log(
+				`[Obi] ${providerName} connection: ${
+					embeddingOk ? "OK" : "FAILED"
+				}`
 			);
 
 			console.log("[Obi] Testing ChromaDB connection...");
@@ -156,9 +247,9 @@ export default class ObiPlugin extends Plugin {
 				`[Obi] ChromaDB connection: ${chromaOk ? "OK" : "FAILED"}`
 			);
 
-			if (!ollamaOk || !chromaOk) {
+			if (!embeddingOk || !chromaOk) {
 				const failures = [];
-				if (!ollamaOk) failures.push("Ollama");
+				if (!embeddingOk) failures.push(providerName);
 				if (!chromaOk) failures.push("ChromaDB");
 				console.warn(
 					`[Obi] Semantic search servers not available: ${failures.join(
@@ -207,10 +298,17 @@ export default class ObiPlugin extends Plugin {
 	 */
 	private updateSemanticSearchConfig(): void {
 		if (this.embeddingClient) {
-			this.embeddingClient.updateConfig({
-				endpoint: this.settings.embeddingEndpoint,
-				model: this.settings.embeddingModel,
-			});
+			if (this.settings.embeddingProvider === "gemini") {
+				this.embeddingClient.updateConfig({
+					apiKey: this.settings.geminiApiKey,
+					model: this.settings.geminiEmbeddingModel,
+				});
+			} else {
+				this.embeddingClient.updateConfig({
+					endpoint: this.settings.embeddingEndpoint,
+					model: this.settings.embeddingModel,
+				});
+			}
 		}
 
 		if (this.vectorStore) {

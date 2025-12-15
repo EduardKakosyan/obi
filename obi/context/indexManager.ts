@@ -1,5 +1,5 @@
 import { App, TFile } from "obsidian";
-import { EmbeddingClient } from "./embeddingClient";
+import { IEmbeddingClient } from "../api/types";
 import { VectorStore } from "./vectorStore";
 import { DocumentChunker, DocumentChunk } from "./documentChunker";
 
@@ -38,7 +38,7 @@ const INDEX_VERSION = 1;
  */
 export class IndexManager {
 	private app: App;
-	private embeddingClient: EmbeddingClient;
+	private embeddingClient: IEmbeddingClient;
 	private vectorStore: VectorStore;
 	private chunker: DocumentChunker;
 	private config: IndexManagerConfig;
@@ -49,7 +49,7 @@ export class IndexManager {
 
 	constructor(
 		app: App,
-		embeddingClient: EmbeddingClient,
+		embeddingClient: IEmbeddingClient,
 		vectorStore: VectorStore,
 		chunker: DocumentChunker,
 		config: Partial<IndexManagerConfig> = {}
@@ -221,7 +221,11 @@ export class IndexManager {
 
 			// Process files in batches
 			let indexed = 0;
-			for (let i = 0; i < changedFiles.length; i += this.config.batchSize) {
+			for (
+				let i = 0;
+				i < changedFiles.length;
+				i += this.config.batchSize
+			) {
 				const batch = changedFiles.slice(i, i + this.config.batchSize);
 				await this.indexFiles(batch);
 				indexed += batch.length;
@@ -451,17 +455,10 @@ export class IndexManager {
  */
 export function createIndexManager(
 	app: App,
-	embeddingClient: EmbeddingClient,
+	embeddingClient: IEmbeddingClient,
 	vectorStore: VectorStore,
 	chunker: DocumentChunker,
 	config: Partial<IndexManagerConfig> = {}
 ): IndexManager {
-	return new IndexManager(
-		app,
-		embeddingClient,
-		vectorStore,
-		chunker,
-		config
-	);
+	return new IndexManager(app, embeddingClient, vectorStore, chunker, config);
 }
-

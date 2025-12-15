@@ -1,7 +1,9 @@
 import { ItemView, WorkspaceLeaf, setIcon, TFile, requestUrl } from "obsidian";
 import type ObiPlugin from "../main";
 import { ChatMessage } from "../types";
-import { LMClient, createLMClient, LMClientError } from "../api/lmClient";
+import { ILMClient, LLMClientError } from "../api/types";
+import { LocalLMClient, createLocalLMClient } from "../api/lmClient";
+import { GeminiLMClient, createGeminiLMClient } from "../api/geminiLmClient";
 import {
 	VaultContextProvider,
 	createVaultContextProvider,
@@ -36,7 +38,6 @@ interface FileSuggestion {
 export class ObiChatView extends ItemView {
 	private plugin: ObiPlugin;
 	private messages: ChatMessage[] = [];
-	private lmClient: LMClient;
 	private contextProvider: VaultContextProvider;
 	private isLoading = false;
 
@@ -57,12 +58,23 @@ export class ObiChatView extends ItemView {
 		super(leaf);
 		this.plugin = plugin;
 
-		// Initialize clients
-		this.lmClient = createLMClient(plugin.settings);
+		// Initialize context provider
 		this.contextProvider = createVaultContextProvider(
 			plugin.app,
 			plugin.settings
 		);
+	}
+
+	/**
+	 * Get the current LLM client based on provider settings
+	 * Creates a fresh client to ensure latest settings are used
+	 */
+	private getLMClient(): ILMClient {
+		if (this.plugin.settings.llmProvider === "gemini") {
+			return createGeminiLMClient(this.plugin.settings);
+		} else {
+			return createLocalLMClient(this.plugin.settings);
+		}
 	}
 
 	getViewType(): string {
@@ -587,6 +599,17 @@ export class ObiChatView extends ItemView {
 		welcome.createEl("p", {
 			text: "👋 Hi! I'm Obi, your vault assistant.",
 		});
+
+		// Show which provider is active
+		const provider =
+			this.plugin.settings.llmProvider === "gemini"
+				? "Gemini (cloud)"
+				: "LM Studio (local)";
+		welcome.createEl("p", {
+			cls: "obi-welcome-provider",
+			text: `Using ${provider}`,
+		});
+
 		welcome.createEl("p", {
 			cls: "obi-welcome-hint",
 			text: "Type @ to search and mention files, then ask your question.",
@@ -632,6 +655,9 @@ export class ObiChatView extends ItemView {
 		const query = this.inputEl.value.trim();
 		if (!query || this.isLoading) return;
 
+		// Check if LLM is configured
+		const lmClient = this.getLMClient();
+
 		// Parse mentioned files
 		const mentionedFiles = this.parseMentions(query);
 		const displayQuery = this.cleanQueryForDisplay(query);
@@ -655,12 +681,7 @@ export class ObiChatView extends ItemView {
 		this.setLoading(true);
 
 		try {
-			// Update clients with latest settings
-			this.lmClient.updateConfig({
-				endpoint: this.plugin.settings.endpoint,
-				model: this.plugin.settings.model,
-				apiKey: this.plugin.settings.apiKey || undefined,
-			});
+			// Update context provider with latest settings
 			this.contextProvider.updateConfig({
 				maxFiles: this.plugin.settings.maxContextFiles,
 				maxTokens: this.plugin.settings.maxContextTokens,
@@ -765,8 +786,8 @@ export class ObiChatView extends ItemView {
 			const recentMessages = this.messages.slice(-historyLimit);
 			apiMessages.push(...recentMessages);
 
-			// Call LM Studio
-			const response = await this.lmClient.chat(apiMessages);
+			// Call LLM
+			const response = await lmClient.chat(apiMessages);
 
 			// Add assistant response
 			this.addMessage(response);
@@ -774,9 +795,9 @@ export class ObiChatView extends ItemView {
 			let errorMessage =
 				"An error occurred while processing your request.";
 
-			if (error instanceof LMClientError) {
+			if (error instanceof LLMClientError) {
 				if (error.statusCode) {
-					errorMessage = `LM Studio error (${error.statusCode}): ${error.message}`;
+					errorMessage = `LLM error (${error.statusCode}): ${error.message}`;
 				} else {
 					errorMessage = error.message;
 				}

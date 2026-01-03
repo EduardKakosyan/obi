@@ -1,36 +1,30 @@
 import { requestUrl } from "obsidian";
 import { DocumentChunk } from "./documentChunker";
+import {
+	IVectorStore,
+	SearchResult,
+	VectorStoreError,
+} from "./vectorStoreTypes";
 
-export interface VectorStoreConfig {
+// Re-export types for backwards compatibility
+export type { SearchResult };
+export { VectorStoreError };
+
+export interface ChromaDBConfig {
 	endpoint: string;
 	collectionName: string;
 	tenant?: string;
 	database?: string;
 }
 
-export interface SearchResult {
-	id: string;
-	filePath: string;
-	content: string;
-	score: number;
-	headingContext?: string;
-}
-
-export class VectorStoreError extends Error {
-	constructor(message: string, public statusCode?: number) {
-		super(message);
-		this.name = "VectorStoreError";
-	}
-}
-
 /**
  * Client for ChromaDB vector database (API v2)
  */
-export class VectorStore {
-	private config: VectorStoreConfig;
+export class ChromaDBVectorStore implements IVectorStore {
+	private config: ChromaDBConfig;
 	private collectionId: string | null = null;
 
-	constructor(config: VectorStoreConfig) {
+	constructor(config: ChromaDBConfig) {
 		this.config = {
 			tenant: "default_tenant",
 			database: "default_database",
@@ -368,11 +362,12 @@ export class VectorStore {
 	/**
 	 * Update configuration
 	 */
-	updateConfig(config: Partial<VectorStoreConfig>) {
+	updateConfig(config: Record<string, unknown>): void {
+		const chromaConfig = config as Partial<ChromaDBConfig>;
 		const needsReinit =
-			config.collectionName &&
-			config.collectionName !== this.config.collectionName;
-		this.config = { ...this.config, ...config };
+			chromaConfig.collectionName &&
+			chromaConfig.collectionName !== this.config.collectionName;
+		this.config = { ...this.config, ...chromaConfig };
 		if (needsReinit) {
 			this.collectionId = null;
 		}
@@ -380,14 +375,18 @@ export class VectorStore {
 }
 
 /**
- * Create a VectorStore from plugin settings
+ * Create a ChromaDBVectorStore from plugin settings
  */
-export function createVectorStore(settings: {
+export function createChromaDBVectorStore(settings: {
 	chromaEndpoint: string;
 	chromaCollection: string;
-}): VectorStore {
-	return new VectorStore({
+}): ChromaDBVectorStore {
+	return new ChromaDBVectorStore({
 		endpoint: settings.chromaEndpoint,
 		collectionName: settings.chromaCollection,
 	});
 }
+
+// Backwards compatibility alias
+export { ChromaDBVectorStore as VectorStore };
+export const createVectorStore = createChromaDBVectorStore;

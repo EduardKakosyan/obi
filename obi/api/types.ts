@@ -5,6 +5,7 @@ import { ChatMessage } from "../types";
  */
 export type LLMProvider = "local" | "gemini";
 export type EmbeddingProvider = "local" | "gemini";
+export type VectorStoreProvider = "chromadb" | "pinecone";
 
 /**
  * Unified interface for LLM clients
@@ -83,3 +84,5 @@ export class EmbeddingClientError extends Error {
 		this.name = "EmbeddingClientError";
 	}
 }
+
+

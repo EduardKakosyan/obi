@@ -1,14 +1,30 @@
-import { ItemView, WorkspaceLeaf, setIcon, TFile, requestUrl } from "obsidian";
+import {
+	ItemView,
+	WorkspaceLeaf,
+	setIcon,
+	TFile,
+	requestUrl,
+	MarkdownRenderer,
+	Component,
+} from "obsidian";
 import type ObiPlugin from "../main";
 import { ChatMessage } from "../types";
-import { ILMClient } from "../api/types";
-import { createLMClient, LMClientError } from "../api/lmClient";
+import { ILMClient, LLMClientError, ChatOptions } from "../api/types";
 import {
 	VaultContextProvider,
 	createVaultContextProvider,
 } from "../context/vaultContext";
+import { ToolCall, ToolResult, LLMResponse } from "../tools/types";
+import {
+	ToolHandler,
+	createToolHandler,
+	TOOL_DEFINITIONS,
+} from "../tools/handlers";
 
 export const OBI_VIEW_TYPE = "obi-chat-view";
+
+/** Maximum number of tool call rounds to prevent infinite loops */
+const MAX_TOOL_ROUNDS = 10;
 
 /** Omnisearch HTTP API response type */
 interface OmnisearchHttpResult {
@@ -37,8 +53,8 @@ interface FileSuggestion {
 export class ObiChatView extends ItemView {
 	private plugin: ObiPlugin;
 	private messages: ChatMessage[] = [];
-	private lmClient: ILMClient;
 	private contextProvider: VaultContextProvider;
+	private toolHandler: ToolHandler;
 	private isLoading = false;
 
 	// DOM elements
@@ -58,12 +74,21 @@ export class ObiChatView extends ItemView {
 		super(leaf);
 		this.plugin = plugin;
 
-		// Initialize clients
-		this.lmClient = createLMClient(plugin.settings);
+		// Initialize context provider
 		this.contextProvider = createVaultContextProvider(
 			plugin.app,
 			plugin.settings
 		);
+
+		// Initialize tool handler
+		this.toolHandler = createToolHandler(plugin.app);
+	}
+
+	/**
+	 * Get the LLM client from the plugin (respects provider setting)
+	 */
+	private getLMClient(): ILMClient | null {
+		return this.plugin.lmClient;
 	}
 
 	getViewType(): string {
@@ -629,6 +654,157 @@ export class ObiChatView extends ItemView {
 		return query.replace(/@\[\[([^\]]+)\]\]/g, "[$1]").trim();
 	}
 
+	/**
+	 * Build system prompt with tool instructions
+	 */
+	private buildToolSystemPrompt(): string {
+		return `You are Obi, a helpful assistant for managing an Obsidian vault.
+
+You have access to tools that can help you work with the vault:
+- create_file: Create new markdown files
+- edit_file: Edit existing files (replace text or append content)
+- read_file: Read file contents
+- list_files: List files in a directory
+- search_vault: Search for files by name
+
+When the user asks you to create, edit, or modify files, use these tools to make the changes.
+After making changes, briefly confirm what you did.
+If you need to see a file's contents before editing, use read_file first.`;
+	}
+
+	/**
+	 * Execute tool calls and return results
+	 */
+	private async executeToolCalls(
+		toolCalls: ToolCall[]
+	): Promise<ToolResult[]> {
+		const results: ToolResult[] = [];
+
+		for (const toolCall of toolCalls) {
+			console.log(
+				`[Obi] Executing tool: ${toolCall.name}`,
+				toolCall.arguments
+			);
+			const result = await this.toolHandler.execute(toolCall);
+			console.log(`[Obi] Tool result:`, result);
+			results.push(result);
+		}
+
+		return results;
+	}
+
+	/**
+	 * Display tool calls in the UI
+	 */
+	private displayToolCalls(toolCalls: ToolCall[]) {
+		const toolEl = this.messagesContainer.createDiv({
+			cls: "obi-tool-calls",
+		});
+
+		for (const toolCall of toolCalls) {
+			const callEl = toolEl.createDiv({ cls: "obi-tool-call" });
+
+			// Tool icon and name
+			const headerEl = callEl.createDiv({ cls: "obi-tool-call-header" });
+			const iconEl = headerEl.createSpan({ cls: "obi-tool-call-icon" });
+			setIcon(iconEl, this.getToolIcon(toolCall.name));
+			headerEl.createSpan({
+				text: this.getToolDisplayName(toolCall.name),
+				cls: "obi-tool-call-name",
+			});
+
+			// Tool arguments summary
+			const argsEl = callEl.createDiv({ cls: "obi-tool-call-args" });
+			argsEl.setText(this.formatToolArgs(toolCall));
+		}
+
+		this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+	}
+
+	/**
+	 * Display tool results in the UI
+	 */
+	private displayToolResults(results: ToolResult[]) {
+		const resultsEl = this.messagesContainer.createDiv({
+			cls: "obi-tool-results",
+		});
+
+		for (const result of results) {
+			const resultEl = resultsEl.createDiv({
+				cls: `obi-tool-result ${
+					result.success
+						? "obi-tool-result-success"
+						: "obi-tool-result-error"
+				}`,
+			});
+
+			const iconEl = resultEl.createSpan({ cls: "obi-tool-result-icon" });
+			setIcon(iconEl, result.success ? "check-circle" : "x-circle");
+
+			// Truncate long results for display
+			const displayContent =
+				result.content.length > 200
+					? result.content.substring(0, 200) + "..."
+					: result.content;
+
+			resultEl.createSpan({
+				text: displayContent,
+				cls: "obi-tool-result-text",
+			});
+		}
+
+		this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+	}
+
+	/**
+	 * Get icon for a tool
+	 */
+	private getToolIcon(toolName: string): string {
+		const icons: Record<string, string> = {
+			create_file: "file-plus",
+			edit_file: "edit",
+			read_file: "file-text",
+			list_files: "folder",
+			search_vault: "search",
+		};
+		return icons[toolName] || "tool";
+	}
+
+	/**
+	 * Get display name for a tool
+	 */
+	private getToolDisplayName(toolName: string): string {
+		const names: Record<string, string> = {
+			create_file: "Creating file",
+			edit_file: "Editing file",
+			read_file: "Reading file",
+			list_files: "Listing files",
+			search_vault: "Searching vault",
+		};
+		return names[toolName] || toolName;
+	}
+
+	/**
+	 * Format tool arguments for display
+	 */
+	private formatToolArgs(toolCall: ToolCall): string {
+		const args = toolCall.arguments;
+		switch (toolCall.name) {
+			case "create_file":
+				return `${args.path}`;
+			case "edit_file":
+				return `${args.path} (${args.mode})`;
+			case "read_file":
+				return `${args.path}`;
+			case "list_files":
+				return `${args.path || "/"}`;
+			case "search_vault":
+				return `"${args.query}"`;
+			default:
+				return JSON.stringify(args);
+		}
+	}
+
 	private async handleSend() {
 		const query = this.inputEl.value.trim();
 		if (!query || this.isLoading) return;
@@ -656,12 +832,15 @@ export class ObiChatView extends ItemView {
 		this.setLoading(true);
 
 		try {
-			// Update clients with latest settings
-			this.lmClient.updateConfig({
-				endpoint: this.plugin.settings.endpoint,
-				model: this.plugin.settings.model,
-				apiKey: this.plugin.settings.apiKey || undefined,
-			});
+			// Get LLM client from plugin (respects provider setting)
+			const lmClient = this.getLMClient();
+			if (!lmClient) {
+				throw new Error(
+					"LLM not configured. Check your settings (API key for Gemini, or LM Studio server for local)."
+				);
+			}
+
+			// Update context provider with latest settings
 			this.contextProvider.updateConfig({
 				maxFiles: this.plugin.settings.maxContextFiles,
 				maxTokens: this.plugin.settings.maxContextTokens,
@@ -669,6 +848,16 @@ export class ObiChatView extends ItemView {
 
 			// Build messages for API
 			const apiMessages: ChatMessage[] = [];
+
+			// Add tool system prompt if tools are enabled
+			const toolsEnabled =
+				this.plugin.settings.enableTools && lmClient.supportsTools();
+			if (toolsEnabled) {
+				apiMessages.push({
+					role: "system",
+					content: this.buildToolSystemPrompt(),
+				});
+			}
 
 			// Gather context from mentioned files + auto-search if enabled
 			let contextPrompt = "";
@@ -717,18 +906,86 @@ export class ObiChatView extends ItemView {
 			const recentMessages = this.messages.slice(-historyLimit);
 			apiMessages.push(...recentMessages);
 
-			// Call LM Studio
-			const response = await this.lmClient.chat(apiMessages);
+			// Prepare chat options
+			const chatOptions: ChatOptions = {};
+			if (toolsEnabled) {
+				chatOptions.tools = TOOL_DEFINITIONS;
+			}
 
-			// Add assistant response
-			this.addMessage(response);
+			// Tool execution loop
+			let response: LLMResponse;
+			let toolRound = 0;
+
+			while (toolRound < MAX_TOOL_ROUNDS) {
+				// Call LLM
+				response = await lmClient.chat(apiMessages, chatOptions);
+
+				// Check if LLM wants to call tools
+				if (response.toolCalls && response.toolCalls.length > 0) {
+					toolRound++;
+					console.log(
+						`[Obi] Tool round ${toolRound}: ${response.toolCalls.length} tool calls`
+					);
+
+					// Display tool calls in UI
+					this.displayToolCalls(response.toolCalls);
+
+					// Execute tools
+					const toolResults = await this.executeToolCalls(
+						response.toolCalls
+					);
+
+					// Display tool results in UI
+					this.displayToolResults(toolResults);
+
+					// Add tool call and results to conversation for next round
+					// For the assistant's tool call, we add a placeholder message
+					apiMessages.push({
+						role: "assistant",
+						content: `[Called tools: ${response.toolCalls
+							.map((tc) => tc.name)
+							.join(", ")}]`,
+					});
+
+					// Add tool results as user message
+					const resultsText = toolResults
+						.map(
+							(r) =>
+								`Tool ${r.callId}: ${
+									r.success ? "SUCCESS" : "ERROR"
+								} - ${r.content}`
+						)
+						.join("\n\n");
+
+					apiMessages.push({
+						role: "user",
+						content: `Tool results:\n\n${resultsText}`,
+					});
+
+					// Update chat options with tool results for next iteration
+					chatOptions.toolResults = toolResults;
+				} else if (response.message) {
+					// Got a text response, we're done
+					this.addMessage(response.message);
+					break;
+				} else {
+					// Unexpected response
+					throw new Error("Received empty response from LLM");
+				}
+			}
+
+			if (toolRound >= MAX_TOOL_ROUNDS) {
+				this.addErrorMessage(
+					"Reached maximum tool call rounds. The agent may be stuck in a loop."
+				);
+			}
 		} catch (error) {
 			let errorMessage =
 				"An error occurred while processing your request.";
 
-			if (error instanceof LMClientError) {
+			if (error instanceof LLMClientError) {
 				if (error.statusCode) {
-					errorMessage = `LM Studio error (${error.statusCode}): ${error.message}`;
+					errorMessage = `LLM error (${error.statusCode}): ${error.message}`;
 				} else {
 					errorMessage = error.message;
 				}
@@ -784,7 +1041,20 @@ export class ObiChatView extends ItemView {
 		});
 
 		const contentEl = messageEl.createDiv({ cls: "obi-message-content" });
-		contentEl.setText(message.content);
+
+		// Render markdown for assistant messages, plain text for user messages
+		if (message.role === "assistant") {
+			// Use Obsidian's markdown renderer
+			MarkdownRenderer.render(
+				this.app,
+				message.content,
+				contentEl,
+				"",
+				this as Component
+			);
+		} else {
+			contentEl.setText(message.content);
+		}
 
 		// Show mentioned files as chips for user messages
 		if (message.role === "user" && mentions && mentions.length > 0) {

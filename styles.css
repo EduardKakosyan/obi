@@ -1,8 +1,721 @@
-/*
+/* Obi Plugin Styles */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+/* ============================================
+   Settings Page
+   ============================================ */
 
-If your plugin does not need CSS, delete this file.
+.obi-setting-info,
+.obi-setting-warning {
+	padding: 10px 14px;
+	border-radius: 8px;
+	margin: 8px 0 16px 0;
+	font-size: 13px;
+	line-height: 1.5;
+}
 
-*/
+.obi-setting-info {
+	background-color: var(--background-secondary);
+	border-left: 3px solid var(--interactive-accent);
+}
+
+.obi-setting-warning {
+	background-color: rgba(255, 204, 0, 0.1);
+	border-left: 3px solid #e6a700;
+}
+
+.obi-setting-info p,
+.obi-setting-warning p {
+	margin: 0;
+	color: var(--text-muted);
+}
+
+/* ============================================
+   Chat Container
+   ============================================ */
+
+.obi-chat-container {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	background-color: var(--background-primary);
+}
+
+/* ============================================
+   Chat Header
+   ============================================ */
+
+.obi-chat-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background-color: var(--background-secondary);
+}
+
+.obi-chat-header h4 {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.obi-clear-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border: none;
+	border-radius: 6px;
+	background-color: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.obi-clear-btn:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.obi-clear-btn:active {
+	background-color: var(--background-modifier-active-hover);
+}
+
+/* ============================================
+   Messages Container
+   ============================================ */
+
+.obi-messages-container {
+	flex: 1;
+	overflow-y: auto;
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+/* ============================================
+   Welcome Message
+   ============================================ */
+
+.obi-welcome {
+	text-align: center;
+	padding: 40px 20px;
+	color: var(--text-muted);
+}
+
+.obi-welcome p {
+	margin: 0 0 8px 0;
+}
+
+.obi-welcome p:first-child {
+	font-size: 18px;
+	color: var(--text-normal);
+}
+
+.obi-welcome-hint {
+	font-size: 14px;
+	opacity: 0.8;
+}
+
+/* ============================================
+   Chat Messages
+   ============================================ */
+
+.obi-message {
+	max-width: 85%;
+	padding: 12px 16px;
+	border-radius: 12px;
+	line-height: 1.5;
+	word-wrap: break-word;
+}
+
+.obi-message-user {
+	align-self: flex-end;
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-bottom-right-radius: 4px;
+}
+
+.obi-message-assistant {
+	align-self: flex-start;
+	background-color: var(--background-secondary);
+	color: var(--text-normal);
+	border-bottom-left-radius: 4px;
+}
+
+.obi-message-system {
+	align-self: center;
+	background-color: var(--background-modifier-border);
+	color: var(--text-muted);
+	font-size: 13px;
+	padding: 8px 12px;
+}
+
+.obi-message-error {
+	align-self: center;
+	background-color: rgba(255, 100, 100, 0.15);
+	color: var(--text-error);
+	border: 1px solid rgba(255, 100, 100, 0.3);
+}
+
+.obi-message-content {
+	white-space: pre-wrap;
+}
+
+/* Markdown rendering in assistant messages */
+.obi-message-assistant .obi-message-content {
+	white-space: normal;
+}
+
+.obi-message-assistant .obi-message-content p {
+	margin: 0 0 0.75em 0;
+}
+
+.obi-message-assistant .obi-message-content p:last-child {
+	margin-bottom: 0;
+}
+
+.obi-message-assistant .obi-message-content h1,
+.obi-message-assistant .obi-message-content h2,
+.obi-message-assistant .obi-message-content h3,
+.obi-message-assistant .obi-message-content h4,
+.obi-message-assistant .obi-message-content h5,
+.obi-message-assistant .obi-message-content h6 {
+	margin: 0.75em 0 0.5em 0;
+	font-weight: 600;
+	line-height: 1.3;
+}
+
+.obi-message-assistant .obi-message-content h1:first-child,
+.obi-message-assistant .obi-message-content h2:first-child,
+.obi-message-assistant .obi-message-content h3:first-child,
+.obi-message-assistant .obi-message-content h4:first-child,
+.obi-message-assistant .obi-message-content h5:first-child,
+.obi-message-assistant .obi-message-content h6:first-child {
+	margin-top: 0;
+}
+
+.obi-message-assistant .obi-message-content h3 {
+	font-size: 1.1em;
+}
+
+.obi-message-assistant .obi-message-content ul,
+.obi-message-assistant .obi-message-content ol {
+	margin: 0.5em 0;
+	padding-left: 1.5em;
+}
+
+.obi-message-assistant .obi-message-content li {
+	margin: 0.25em 0;
+}
+
+.obi-message-assistant .obi-message-content code {
+	background-color: rgba(0, 0, 0, 0.2);
+	padding: 0.15em 0.4em;
+	border-radius: 4px;
+	font-size: 0.9em;
+	font-family: var(--font-monospace);
+}
+
+.obi-message-assistant .obi-message-content pre {
+	background-color: rgba(0, 0, 0, 0.2);
+	padding: 0.75em 1em;
+	border-radius: 6px;
+	overflow-x: auto;
+	margin: 0.75em 0;
+}
+
+.obi-message-assistant .obi-message-content pre code {
+	background: none;
+	padding: 0;
+}
+
+.obi-message-assistant .obi-message-content blockquote {
+	border-left: 3px solid var(--text-muted);
+	margin: 0.75em 0;
+	padding-left: 1em;
+	color: var(--text-muted);
+}
+
+.obi-message-assistant .obi-message-content strong {
+	font-weight: 600;
+}
+
+.obi-message-assistant .obi-message-content a {
+	color: var(--interactive-accent);
+	text-decoration: underline;
+}
+
+.obi-message-assistant .obi-message-content hr {
+	border: none;
+	border-top: 1px solid var(--background-modifier-border);
+	margin: 1em 0;
+}
+
+/* ============================================
+   Mention Chips
+   ============================================ */
+
+.obi-mention-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.obi-mention-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 10px;
+	border-radius: 20px;
+	background-color: rgba(255, 255, 255, 0.15);
+	font-size: 12px;
+	cursor: pointer;
+	transition: background-color 0.15s ease;
+}
+
+.obi-mention-chip:hover {
+	background-color: rgba(255, 255, 255, 0.25);
+}
+
+.obi-mention-chip-icon {
+	display: flex;
+	align-items: center;
+}
+
+.obi-mention-chip-icon svg {
+	width: 12px;
+	height: 12px;
+}
+
+/* ============================================
+   Loading Animation
+   ============================================ */
+
+.obi-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 16px;
+	align-self: flex-start;
+}
+
+.obi-loading-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background-color: var(--text-muted);
+	animation: obi-bounce 1.4s ease-in-out infinite both;
+}
+
+.obi-loading-dot:nth-child(1) {
+	animation-delay: -0.32s;
+}
+
+.obi-loading-dot:nth-child(2) {
+	animation-delay: -0.16s;
+}
+
+@keyframes obi-bounce {
+	0%,
+	80%,
+	100% {
+		transform: scale(0.6);
+		opacity: 0.5;
+	}
+	40% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+
+/* ============================================
+   Input Area
+   ============================================ */
+
+.obi-input-wrapper {
+	position: relative;
+	padding: 12px 16px;
+	border-top: 1px solid var(--background-modifier-border);
+	background-color: var(--background-secondary);
+}
+
+.obi-input-container {
+	display: flex;
+	align-items: flex-end;
+	gap: 10px;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	padding: 8px 12px;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.obi-input-container:focus-within {
+	border-color: var(--interactive-accent);
+	box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
+}
+
+.obi-input {
+	flex: 1;
+	min-height: 24px;
+	max-height: 150px;
+	padding: 4px 0;
+	border: none;
+	background: transparent;
+	color: var(--text-normal);
+	font-size: 14px;
+	line-height: 1.5;
+	resize: none;
+	outline: none;
+	font-family: inherit;
+}
+
+.obi-input::placeholder {
+	color: var(--text-faint);
+}
+
+.obi-send-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	padding: 0;
+	border: none;
+	border-radius: 8px;
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	cursor: pointer;
+	transition: all 0.15s ease;
+	flex-shrink: 0;
+}
+
+.obi-send-btn:hover:not(:disabled) {
+	filter: brightness(1.1);
+	transform: scale(1.02);
+}
+
+.obi-send-btn:active:not(:disabled) {
+	transform: scale(0.98);
+}
+
+.obi-send-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.obi-send-btn svg {
+	width: 18px;
+	height: 18px;
+}
+
+/* ============================================
+   @ Mention Suggestions Popup
+   ============================================ */
+
+.obi-suggestions {
+	position: absolute;
+	bottom: 100%;
+	left: 16px;
+	right: 16px;
+	margin-bottom: 8px;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 12px;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+	overflow: hidden;
+	z-index: 100;
+}
+
+.obi-suggestions-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 10px 14px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background-color: var(--background-secondary);
+}
+
+.obi-suggestions-title {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.obi-suggestions-count {
+	font-size: 11px;
+	color: var(--text-faint);
+}
+
+.obi-suggestions-list {
+	max-height: 280px;
+	overflow-y: auto;
+	padding: 6px;
+}
+
+.obi-suggestion-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 12px;
+	border-radius: 8px;
+	cursor: pointer;
+	transition: background-color 0.1s ease;
+}
+
+.obi-suggestion-item:hover,
+.obi-suggestion-item.is-selected {
+	background-color: var(--background-modifier-hover);
+}
+
+.obi-suggestion-item.is-selected {
+	background-color: var(--background-modifier-active-hover);
+}
+
+.obi-suggestion-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 6px;
+	background-color: var(--background-secondary);
+	color: var(--text-muted);
+	flex-shrink: 0;
+}
+
+.obi-suggestion-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.obi-suggestion-text {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.obi-suggestion-name {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--text-normal);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.obi-suggestion-path {
+	font-size: 12px;
+	color: var(--text-faint);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin-top: 2px;
+}
+
+.obi-suggestion-excerpt {
+	font-size: 12px;
+	color: var(--text-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	margin-top: 2px;
+}
+
+.obi-suggestion-score {
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--text-faint);
+	background-color: var(--background-secondary);
+	padding: 2px 8px;
+	border-radius: 10px;
+	flex-shrink: 0;
+}
+
+.obi-suggestions-hint {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 8px 14px;
+	border-top: 1px solid var(--background-modifier-border);
+	background-color: var(--background-secondary);
+	font-size: 11px;
+	color: var(--text-faint);
+}
+
+.obi-suggestions-hint kbd {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 20px;
+	padding: 2px 6px;
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	font-family: inherit;
+	font-size: 10px;
+}
+
+.obi-no-results {
+	padding: 20px;
+	text-align: center;
+	color: var(--text-muted);
+	font-size: 13px;
+}
+
+/* ============================================
+   Tool Calls and Results
+   ============================================ */
+
+.obi-tool-calls {
+	align-self: flex-start;
+	max-width: 90%;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 8px 0;
+}
+
+.obi-tool-call {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 10px 14px;
+	background-color: var(--background-secondary);
+	border-radius: 8px;
+	border-left: 3px solid var(--interactive-accent);
+}
+
+.obi-tool-call-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.obi-tool-call-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	color: var(--interactive-accent);
+}
+
+.obi-tool-call-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.obi-tool-call-name {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-normal);
+}
+
+.obi-tool-call-args {
+	font-size: 12px;
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+	padding-left: 28px;
+	word-break: break-all;
+}
+
+.obi-tool-results {
+	align-self: flex-start;
+	max-width: 90%;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 4px 0;
+}
+
+.obi-tool-result {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 8px 12px;
+	border-radius: 6px;
+	font-size: 12px;
+}
+
+.obi-tool-result-success {
+	background-color: rgba(0, 200, 100, 0.1);
+	border: 1px solid rgba(0, 200, 100, 0.2);
+}
+
+.obi-tool-result-error {
+	background-color: rgba(255, 100, 100, 0.1);
+	border: 1px solid rgba(255, 100, 100, 0.2);
+}
+
+.obi-tool-result-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	margin-top: 1px;
+}
+
+.obi-tool-result-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.obi-tool-result-success .obi-tool-result-icon {
+	color: rgb(0, 180, 90);
+}
+
+.obi-tool-result-error .obi-tool-result-icon {
+	color: rgb(220, 80, 80);
+}
+
+.obi-tool-result-text {
+	flex: 1;
+	color: var(--text-muted);
+	line-height: 1.4;
+	word-break: break-word;
+}
+
+/* ============================================
+   Settings Hints
+   ============================================ */
+
+.obi-setting-hint {
+	font-style: italic;
+	margin-top: 8px !important;
+}
+
+/* ============================================
+   Scrollbar Styling
+   ============================================ */
+
+.obi-messages-container::-webkit-scrollbar,
+.obi-suggestions-list::-webkit-scrollbar {
+	width: 8px;
+}
+
+.obi-messages-container::-webkit-scrollbar-track,
+.obi-suggestions-list::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.obi-messages-container::-webkit-scrollbar-thumb,
+.obi-suggestions-list::-webkit-scrollbar-thumb {
+	background-color: var(--background-modifier-border);
+	border-radius: 4px;
+}
+
+.obi-messages-container::-webkit-scrollbar-thumb:hover,
+.obi-suggestions-list::-webkit-scrollbar-thumb:hover {
+	background-color: var(--background-modifier-border-hover);
+}

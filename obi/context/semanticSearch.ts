@@ -1,6 +1,6 @@
 import { App } from "obsidian";
 import { IEmbeddingClient } from "../api/types";
-import { VectorStore, SearchResult } from "./vectorStore";
+import { IVectorStore, SearchResult } from "./vectorStoreTypes";
 import { IndexManager } from "./indexManager";
 import { ContextSnippet } from "../types";
 
@@ -25,14 +25,14 @@ const DEFAULT_CONFIG: SemanticSearchConfig = {
 export class SemanticSearch {
 	private app: App;
 	private embeddingClient: IEmbeddingClient;
-	private vectorStore: VectorStore;
+	private vectorStore: IVectorStore;
 	private indexManager: IndexManager;
 	private config: SemanticSearchConfig;
 
 	constructor(
 		app: App,
 		embeddingClient: IEmbeddingClient,
-		vectorStore: VectorStore,
+		vectorStore: IVectorStore,
 		indexManager: IndexManager,
 		config: Partial<SemanticSearchConfig> = {}
 	) {
@@ -248,7 +248,7 @@ export class SemanticSearch {
 export function createSemanticSearch(
 	app: App,
 	embeddingClient: IEmbeddingClient,
-	vectorStore: VectorStore,
+	vectorStore: IVectorStore,
 	indexManager: IndexManager,
 	config: Partial<SemanticSearchConfig> = {}
 ): SemanticSearch {

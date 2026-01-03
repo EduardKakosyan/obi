@@ -1,6 +1,10 @@
 import { App, PluginSettingTab, Setting, Notice } from "obsidian";
 import type ObiPlugin from "./main";
-import { LLMProvider, EmbeddingProvider } from "./api/types";
+import {
+	LLMProvider,
+	EmbeddingProvider,
+	VectorStoreProvider,
+} from "./api/types";
 
 export interface ObiSettings {
 	// Provider Selection
@@ -8,6 +12,8 @@ export interface ObiSettings {
 	llmProvider: LLMProvider;
 	/** Which embedding provider to use */
 	embeddingProvider: EmbeddingProvider;
+	/** Which vector store provider to use */
+	vectorStoreProvider: VectorStoreProvider;
 
 	// Local LLM Settings (LM Studio)
 	/** LM Studio API endpoint */
@@ -57,6 +63,14 @@ export interface ObiSettings {
 	/** ChromaDB collection name */
 	chromaCollection: string;
 
+	// Vector Store Settings (Pinecone)
+	/** Pinecone API key */
+	pineconeApiKey: string;
+	/** Pinecone index name */
+	pineconeIndex: string;
+	/** Pinecone namespace (optional, for organizing vectors) */
+	pineconeNamespace: string;
+
 	// Search Tuning
 	/** Minimum similarity score for search results (0-1) */
 	minSimilarityScore: number;
@@ -70,6 +84,7 @@ export const DEFAULT_SETTINGS: ObiSettings = {
 	// Provider Selection
 	llmProvider: "local",
 	embeddingProvider: "local",
+	vectorStoreProvider: "chromadb",
 
 	// Local LLM
 	endpoint: "http://localhost:1234/v1",
@@ -101,6 +116,11 @@ export const DEFAULT_SETTINGS: ObiSettings = {
 	// Vector Store (ChromaDB)
 	chromaEndpoint: "http://localhost:8000",
 	chromaCollection: "obi-vault",
+
+	// Vector Store (Pinecone)
+	pineconeApiKey: "",
+	pineconeIndex: "obi",
+	pineconeNamespace: "",
 
 	// Search Tuning
 	minSimilarityScore: 0.3,
@@ -157,6 +177,24 @@ export class ObiSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.embeddingProvider =
 							value as EmbeddingProvider;
+						await this.plugin.saveSettings();
+						this.display(); // Refresh to show/hide relevant sections
+					})
+			);
+
+		new Setting(containerEl)
+			.setName("Vector store provider")
+			.setDesc(
+				"Choose between local (ChromaDB) or cloud (Pinecone) for storing embeddings."
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("chromadb", "Local (ChromaDB)")
+					.addOption("pinecone", "Cloud (Pinecone)")
+					.setValue(this.plugin.settings.vectorStoreProvider)
+					.onChange(async (value) => {
+						this.plugin.settings.vectorStoreProvider =
+							value as VectorStoreProvider;
 						await this.plugin.saveSettings();
 						this.display(); // Refresh to show/hide relevant sections
 					})
@@ -346,35 +384,98 @@ export class ObiSettingTab extends PluginSettingTab {
 				);
 		}
 
-		// Vector Store Settings (ChromaDB) - always shown when semantic search enabled
+		// Vector Store Settings - shown when semantic search enabled
 		if (this.plugin.settings.useSemanticSearch) {
-			containerEl.createEl("h4", { text: "Vector store (ChromaDB)" });
+			// ChromaDB settings (shown when using local vector store)
+			if (this.plugin.settings.vectorStoreProvider === "chromadb") {
+				containerEl.createEl("h4", { text: "Vector store (ChromaDB)" });
 
-			new Setting(containerEl)
-				.setName("ChromaDB endpoint")
-				.setDesc("The URL of your local ChromaDB server.")
-				.addText((text) =>
-					text
-						.setPlaceholder("http://localhost:8000")
-						.setValue(this.plugin.settings.chromaEndpoint)
-						.onChange(async (value) => {
-							this.plugin.settings.chromaEndpoint = value;
-							await this.plugin.saveSettings();
-						})
-				);
+				new Setting(containerEl)
+					.setName("ChromaDB endpoint")
+					.setDesc("The URL of your local ChromaDB server.")
+					.addText((text) =>
+						text
+							.setPlaceholder("http://localhost:8000")
+							.setValue(this.plugin.settings.chromaEndpoint)
+							.onChange(async (value) => {
+								this.plugin.settings.chromaEndpoint = value;
+								await this.plugin.saveSettings();
+							})
+					);
 
-			new Setting(containerEl)
-				.setName("Collection name")
-				.setDesc("ChromaDB collection name to store vault embeddings.")
-				.addText((text) =>
-					text
-						.setPlaceholder("obi-vault")
-						.setValue(this.plugin.settings.chromaCollection)
-						.onChange(async (value) => {
-							this.plugin.settings.chromaCollection = value;
-							await this.plugin.saveSettings();
-						})
-				);
+				new Setting(containerEl)
+					.setName("Collection name")
+					.setDesc(
+						"ChromaDB collection name to store vault embeddings."
+					)
+					.addText((text) =>
+						text
+							.setPlaceholder("obi-vault")
+							.setValue(this.plugin.settings.chromaCollection)
+							.onChange(async (value) => {
+								this.plugin.settings.chromaCollection = value;
+								await this.plugin.saveSettings();
+							})
+					);
+			}
+
+			// Pinecone settings (shown when using cloud vector store)
+			if (this.plugin.settings.vectorStoreProvider === "pinecone") {
+				containerEl.createEl("h4", { text: "Vector store (Pinecone)" });
+
+				new Setting(containerEl)
+					.setName("Pinecone API key")
+					.setDesc(
+						"Your Pinecone API key from the Pinecone console. Stored securely in plugin data (not synced to Git)."
+					)
+					.addText((text) =>
+						text
+							.setPlaceholder("Enter your Pinecone API key")
+							.setValue(this.plugin.settings.pineconeApiKey)
+							.onChange(async (value) => {
+								this.plugin.settings.pineconeApiKey = value;
+								await this.plugin.saveSettings();
+							})
+					);
+
+				new Setting(containerEl)
+					.setName("Index name")
+					.setDesc(
+						"The name of your Pinecone index. Must be created in the Pinecone console first."
+					)
+					.addText((text) =>
+						text
+							.setPlaceholder("obi-vault")
+							.setValue(this.plugin.settings.pineconeIndex)
+							.onChange(async (value) => {
+								this.plugin.settings.pineconeIndex = value;
+								await this.plugin.saveSettings();
+							})
+					);
+
+				new Setting(containerEl)
+					.setName("Namespace")
+					.setDesc(
+						"Optional namespace for organizing vectors (leave empty for default)."
+					)
+					.addText((text) =>
+						text
+							.setPlaceholder("(default)")
+							.setValue(this.plugin.settings.pineconeNamespace)
+							.onChange(async (value) => {
+								this.plugin.settings.pineconeNamespace = value;
+								await this.plugin.saveSettings();
+							})
+					);
+
+				// Add info about dimension matching
+				const infoEl = containerEl.createDiv({
+					cls: "obi-setting-info",
+				});
+				infoEl.createEl("p", {
+					text: "ℹ️ Your Pinecone index dimension must match your embedding model's output dimension. Gemini embeddings use 768 dimensions, Ollama models vary (e.g., mxbai-embed-large uses 1024).",
+				});
+			}
 
 			// Search Tuning
 			containerEl.createEl("h4", { text: "Search tuning" });
@@ -598,12 +699,25 @@ export class ObiSettingTab extends PluginSettingTab {
 				results.push("✗ Embedding client (not initialized)");
 			}
 
-			// Test ChromaDB
+			// Test Vector Store
 			if (this.plugin.vectorStore) {
-				const chromaOk = await this.plugin.vectorStore.testConnection();
-				results.push(chromaOk ? "✓ ChromaDB" : "✗ ChromaDB");
+				const vectorStoreOk =
+					await this.plugin.vectorStore.testConnection();
+				const vectorStoreName =
+					this.plugin.settings.vectorStoreProvider === "pinecone"
+						? "Pinecone"
+						: "ChromaDB";
+				results.push(
+					vectorStoreOk
+						? `✓ ${vectorStoreName}`
+						: `✗ ${vectorStoreName}`
+				);
 			} else {
-				results.push("✗ ChromaDB (not initialized)");
+				const vectorStoreName =
+					this.plugin.settings.vectorStoreProvider === "pinecone"
+						? "Pinecone"
+						: "ChromaDB";
+				results.push(`✗ ${vectorStoreName} (not initialized)`);
 			}
 
 			notice.hide();

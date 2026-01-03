@@ -1,16 +1,8 @@
-import {
-	ItemView,
-	WorkspaceLeaf,
-	setIcon,
-	TFile,
-	requestUrl,
-	MarkdownRenderer,
-} from "obsidian";
+import { ItemView, WorkspaceLeaf, setIcon, TFile, requestUrl } from "obsidian";
 import type ObiPlugin from "../main";
 import { ChatMessage } from "../types";
-import { ILMClient, LLMClientError } from "../api/types";
-import { LocalLMClient, createLocalLMClient } from "../api/lmClient";
-import { GeminiLMClient, createGeminiLMClient } from "../api/geminiLmClient";
+import { ILMClient } from "../api/types";
+import { createLMClient, LMClientError } from "../api/lmClient";
 import {
 	VaultContextProvider,
 	createVaultContextProvider,
@@ -45,6 +37,7 @@ interface FileSuggestion {
 export class ObiChatView extends ItemView {
 	private plugin: ObiPlugin;
 	private messages: ChatMessage[] = [];
+	private lmClient: ILMClient;
 	private contextProvider: VaultContextProvider;
 	private isLoading = false;
 
@@ -65,23 +58,12 @@ export class ObiChatView extends ItemView {
 		super(leaf);
 		this.plugin = plugin;
 
-		// Initialize context provider
+		// Initialize clients
+		this.lmClient = createLMClient(plugin.settings);
 		this.contextProvider = createVaultContextProvider(
 			plugin.app,
 			plugin.settings
 		);
-	}
-
-	/**
-	 * Get the current LLM client based on provider settings
-	 * Creates a fresh client to ensure latest settings are used
-	 */
-	private getLMClient(): ILMClient {
-		if (this.plugin.settings.llmProvider === "gemini") {
-			return createGeminiLMClient(this.plugin.settings);
-		} else {
-			return createLocalLMClient(this.plugin.settings);
-		}
 	}
 
 	getViewType(): string {
@@ -606,17 +588,6 @@ export class ObiChatView extends ItemView {
 		welcome.createEl("p", {
 			text: "👋 Hi! I'm Obi, your vault assistant.",
 		});
-
-		// Show which provider is active
-		const provider =
-			this.plugin.settings.llmProvider === "gemini"
-				? "Gemini (cloud)"
-				: "LM Studio (local)";
-		welcome.createEl("p", {
-			cls: "obi-welcome-provider",
-			text: `Using ${provider}`,
-		});
-
 		welcome.createEl("p", {
 			cls: "obi-welcome-hint",
 			text: "Type @ to search and mention files, then ask your question.",
@@ -662,9 +633,6 @@ export class ObiChatView extends ItemView {
 		const query = this.inputEl.value.trim();
 		if (!query || this.isLoading) return;
 
-		// Check if LLM is configured
-		const lmClient = this.getLMClient();
-
 		// Parse mentioned files
 		const mentionedFiles = this.parseMentions(query);
 		const displayQuery = this.cleanQueryForDisplay(query);
@@ -679,7 +647,7 @@ export class ObiChatView extends ItemView {
 		if (welcome) welcome.remove();
 
 		// Add user message (cleaned for display)
-		await this.addMessage(
+		this.addMessage(
 			{ role: "user", content: displayQuery },
 			mentionedFiles
 		);
@@ -688,7 +656,12 @@ export class ObiChatView extends ItemView {
 		this.setLoading(true);
 
 		try {
-			// Update context provider with latest settings
+			// Update clients with latest settings
+			this.lmClient.updateConfig({
+				endpoint: this.plugin.settings.endpoint,
+				model: this.plugin.settings.model,
+				apiKey: this.plugin.settings.apiKey || undefined,
+			});
 			this.contextProvider.updateConfig({
 				maxFiles: this.plugin.settings.maxContextFiles,
 				maxTokens: this.plugin.settings.maxContextTokens,
@@ -712,72 +685,23 @@ export class ObiChatView extends ItemView {
 
 			// Add auto-searched context if enabled
 			if (this.plugin.settings.enableContext) {
-				const mentionedPaths = mentionedFiles.map((m) => m.file.path);
+				const snippets = await this.contextProvider.gatherContext(
+					displayQuery
+				);
+				// Filter out already-mentioned files
+				const mentionedPaths = new Set(
+					mentionedFiles.map((m) => m.file.path)
+				);
+				const filteredSnippets = snippets.filter(
+					(s) => !mentionedPaths.has(s.filePath)
+				);
 
-				// Use semantic search if enabled and available
-				if (
-					this.plugin.settings.useSemanticSearch &&
-					this.plugin.semanticSearch
-				) {
-					try {
-						const snippets =
-							await this.plugin.semanticSearch.searchWithMentions(
-								displayQuery,
-								mentionedPaths
-							);
-
-						// Filter out already-mentioned files
-						const mentionedPathSet = new Set(mentionedPaths);
-						const filteredSnippets = snippets.filter(
-							(s) => !mentionedPathSet.has(s.filePath)
-						);
-
-						const autoContext =
-							this.plugin.semanticSearch.formatContextForPrompt(
-								filteredSnippets
-							);
-						if (autoContext) {
-							contextPrompt += autoContext;
-						}
-					} catch (e) {
-						console.warn(
-							"[Obi] Semantic search failed, falling back to keyword search:",
-							e
-						);
-						// Fall back to keyword search
-						const snippets =
-							await this.contextProvider.gatherContext(
-								displayQuery
-							);
-						const mentionedPathSet = new Set(mentionedPaths);
-						const filteredSnippets = snippets.filter(
-							(s) => !mentionedPathSet.has(s.filePath)
-						);
-						const autoContext =
-							this.contextProvider.formatContextForPrompt(
-								filteredSnippets
-							);
-						if (autoContext) {
-							contextPrompt += autoContext;
-						}
-					}
-				} else {
-					// Use keyword-based search
-					const snippets = await this.contextProvider.gatherContext(
-						displayQuery
+				const autoContext =
+					this.contextProvider.formatContextForPrompt(
+						filteredSnippets
 					);
-					const mentionedPathSet = new Set(mentionedPaths);
-					const filteredSnippets = snippets.filter(
-						(s) => !mentionedPathSet.has(s.filePath)
-					);
-
-					const autoContext =
-						this.contextProvider.formatContextForPrompt(
-							filteredSnippets
-						);
-					if (autoContext) {
-						contextPrompt += autoContext;
-					}
+				if (autoContext) {
+					contextPrompt += autoContext;
 				}
 			}
 
@@ -793,18 +717,18 @@ export class ObiChatView extends ItemView {
 			const recentMessages = this.messages.slice(-historyLimit);
 			apiMessages.push(...recentMessages);
 
-			// Call LLM
-			const response = await lmClient.chat(apiMessages);
+			// Call LM Studio
+			const response = await this.lmClient.chat(apiMessages);
 
 			// Add assistant response
-			await this.addMessage(response);
+			this.addMessage(response);
 		} catch (error) {
 			let errorMessage =
 				"An error occurred while processing your request.";
 
-			if (error instanceof LLMClientError) {
+			if (error instanceof LMClientError) {
 				if (error.statusCode) {
-					errorMessage = `LLM error (${error.statusCode}): ${error.message}`;
+					errorMessage = `LM Studio error (${error.statusCode}): ${error.message}`;
 				} else {
 					errorMessage = error.message;
 				}
@@ -852,7 +776,7 @@ export class ObiChatView extends ItemView {
 		return parts.join("\n");
 	}
 
-	private async addMessage(message: ChatMessage, mentions?: MentionedFile[]) {
+	private addMessage(message: ChatMessage, mentions?: MentionedFile[]) {
 		this.messages.push(message);
 
 		const messageEl = this.messagesContainer.createDiv({
@@ -860,28 +784,7 @@ export class ObiChatView extends ItemView {
 		});
 
 		const contentEl = messageEl.createDiv({ cls: "obi-message-content" });
-
-		// Render markdown for assistant messages, plain text for user messages
-		if (message.role === "assistant") {
-			try {
-				await MarkdownRenderer.render(
-					this.plugin.app,
-					message.content,
-					contentEl,
-					"",
-					this
-				);
-			} catch (e) {
-				// Fallback to plain text if markdown rendering fails
-				console.warn(
-					"[Obi] Markdown rendering failed, using plain text:",
-					e
-				);
-				contentEl.setText(message.content);
-			}
-		} else {
-			contentEl.setText(message.content);
-		}
+		contentEl.setText(message.content);
 
 		// Show mentioned files as chips for user messages
 		if (message.role === "user" && mentions && mentions.length > 0) {

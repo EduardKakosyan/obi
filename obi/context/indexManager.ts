@@ -1,6 +1,6 @@
 import { App, TFile } from "obsidian";
 import { IEmbeddingClient } from "../api/types";
-import { VectorStore } from "./vectorStore";
+import { IVectorStore } from "./vectorStoreTypes";
 import { DocumentChunker, DocumentChunk } from "./documentChunker";
 
 export interface IndexState {
@@ -39,7 +39,7 @@ const INDEX_VERSION = 1;
 export class IndexManager {
 	private app: App;
 	private embeddingClient: IEmbeddingClient;
-	private vectorStore: VectorStore;
+	private vectorStore: IVectorStore;
 	private chunker: DocumentChunker;
 	private config: IndexManagerConfig;
 	private state: IndexState;
@@ -50,7 +50,7 @@ export class IndexManager {
 	constructor(
 		app: App,
 		embeddingClient: IEmbeddingClient,
-		vectorStore: VectorStore,
+		vectorStore: IVectorStore,
 		chunker: DocumentChunker,
 		config: Partial<IndexManagerConfig> = {}
 	) {
@@ -456,7 +456,7 @@ export class IndexManager {
 export function createIndexManager(
 	app: App,
 	embeddingClient: IEmbeddingClient,
-	vectorStore: VectorStore,
+	vectorStore: IVectorStore,
 	chunker: DocumentChunker,
 	config: Partial<IndexManagerConfig> = {}
 ): IndexManager {

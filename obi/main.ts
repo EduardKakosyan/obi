@@ -11,7 +11,15 @@ import {
 	GeminiEmbeddingClient,
 	createGeminiEmbeddingClient,
 } from "./context/geminiEmbeddingClient";
-import { VectorStore, createVectorStore } from "./context/vectorStore";
+import { IVectorStore } from "./context/vectorStoreTypes";
+import {
+	ChromaDBVectorStore,
+	createChromaDBVectorStore,
+} from "./context/vectorStore";
+import {
+	PineconeVectorStore,
+	createPineconeVectorStore,
+} from "./context/pineconeVectorStore";
 import {
 	DocumentChunker,
 	createDocumentChunker,
@@ -29,7 +37,7 @@ export default class ObiPlugin extends Plugin {
 
 	// Semantic search components (exposed for settings tab)
 	embeddingClient: IEmbeddingClient | null = null;
-	vectorStore: VectorStore | null = null;
+	vectorStore: IVectorStore | null = null;
 	indexManager: IndexManager | null = null;
 	semanticSearch: SemanticSearch | null = null;
 
@@ -117,9 +125,11 @@ export default class ObiPlugin extends Plugin {
 		} else if (!this.settings.useSemanticSearch && this.semanticSearch) {
 			await this.shutdownSemanticSearch();
 		} else if (this.settings.useSemanticSearch) {
-			// Check if embedding provider changed
-			const needsReinit = this.checkEmbeddingProviderChanged();
-			if (needsReinit) {
+			// Check if embedding or vector store provider changed
+			const embeddingChanged = this.checkEmbeddingProviderChanged();
+			const vectorStoreChanged = this.checkVectorStoreProviderChanged();
+
+			if (embeddingChanged || vectorStoreChanged) {
 				await this.shutdownSemanticSearch();
 				await this.initializeSemanticSearch();
 			} else {
@@ -140,6 +150,20 @@ export default class ObiPlugin extends Plugin {
 		const shouldBeLocal = this.settings.embeddingProvider === "local";
 
 		return isCurrentlyLocal !== shouldBeLocal;
+	}
+
+	/**
+	 * Check if the vector store provider type has changed
+	 */
+	private checkVectorStoreProviderChanged(): boolean {
+		if (!this.vectorStore) return true;
+
+		const isCurrentlyChromaDB =
+			this.vectorStore instanceof ChromaDBVectorStore;
+		const shouldBeChromaDB =
+			this.settings.vectorStoreProvider === "chromadb";
+
+		return isCurrentlyChromaDB !== shouldBeChromaDB;
 	}
 
 	/**
@@ -180,6 +204,23 @@ export default class ObiPlugin extends Plugin {
 	}
 
 	/**
+	 * Create the appropriate vector store based on provider setting
+	 */
+	private createVectorStore(): IVectorStore | null {
+		if (this.settings.vectorStoreProvider === "pinecone") {
+			if (!this.settings.pineconeApiKey) {
+				console.warn("[Obi] Pinecone API key not configured");
+				return null;
+			}
+			console.log("[Obi] Using Pinecone vector store");
+			return createPineconeVectorStore(this.settings);
+		} else {
+			console.log("[Obi] Using ChromaDB vector store");
+			return createChromaDBVectorStore(this.settings);
+		}
+	}
+
+	/**
 	 * Initialize semantic search components
 	 */
 	private async initializeSemanticSearch(): Promise<void> {
@@ -196,8 +237,21 @@ export default class ObiPlugin extends Plugin {
 				return;
 			}
 
-			// Create vector store and chunker
-			this.vectorStore = createVectorStore(this.settings);
+			// Create vector store based on provider
+			this.vectorStore = this.createVectorStore();
+			if (!this.vectorStore) {
+				const providerName =
+					this.settings.vectorStoreProvider === "pinecone"
+						? "Pinecone"
+						: "ChromaDB";
+				new Notice(
+					`Obi: ${providerName} not configured. Check your settings.`,
+					5000
+				);
+				return;
+			}
+
+			// Create chunker
 			this.chunker = createDocumentChunker({
 				targetChunkSize: this.settings.chunkSize,
 				chunkOverlap: this.settings.chunkOverlap,
@@ -226,31 +280,40 @@ export default class ObiPlugin extends Plugin {
 			await this.indexManager.initialize();
 
 			// Test connections
-			const providerName =
+			const embeddingProviderName =
 				this.settings.embeddingProvider === "gemini"
 					? "Gemini"
 					: "Ollama";
 
+			const vectorStoreProviderName =
+				this.settings.vectorStoreProvider === "pinecone"
+					? "Pinecone"
+					: "ChromaDB";
+
 			console.log(
-				`[Obi] Testing ${providerName} embedding connection...`
+				`[Obi] Testing ${embeddingProviderName} embedding connection...`
 			);
 			const embeddingOk = await this.embeddingClient.testConnection();
 			console.log(
-				`[Obi] ${providerName} connection: ${
+				`[Obi] ${embeddingProviderName} connection: ${
 					embeddingOk ? "OK" : "FAILED"
 				}`
 			);
 
-			console.log("[Obi] Testing ChromaDB connection...");
-			const chromaOk = await this.vectorStore.testConnection();
 			console.log(
-				`[Obi] ChromaDB connection: ${chromaOk ? "OK" : "FAILED"}`
+				`[Obi] Testing ${vectorStoreProviderName} connection...`
+			);
+			const vectorStoreOk = await this.vectorStore.testConnection();
+			console.log(
+				`[Obi] ${vectorStoreProviderName} connection: ${
+					vectorStoreOk ? "OK" : "FAILED"
+				}`
 			);
 
-			if (!embeddingOk || !chromaOk) {
+			if (!embeddingOk || !vectorStoreOk) {
 				const failures = [];
-				if (!embeddingOk) failures.push(providerName);
-				if (!chromaOk) failures.push("ChromaDB");
+				if (!embeddingOk) failures.push(embeddingProviderName);
+				if (!vectorStoreOk) failures.push(vectorStoreProviderName);
 				console.warn(
 					`[Obi] Semantic search servers not available: ${failures.join(
 						", "
@@ -338,10 +401,18 @@ export default class ObiPlugin extends Plugin {
 		}
 
 		if (this.vectorStore) {
-			this.vectorStore.updateConfig({
-				endpoint: this.settings.chromaEndpoint,
-				collectionName: this.settings.chromaCollection,
-			});
+			if (this.settings.vectorStoreProvider === "pinecone") {
+				this.vectorStore.updateConfig({
+					apiKey: this.settings.pineconeApiKey,
+					indexName: this.settings.pineconeIndex,
+					namespace: this.settings.pineconeNamespace,
+				});
+			} else {
+				this.vectorStore.updateConfig({
+					endpoint: this.settings.chromaEndpoint,
+					collectionName: this.settings.chromaCollection,
+				});
+			}
 		}
 
 		if (this.chunker) {

@@ -78,6 +78,10 @@ export interface ObiSettings {
 	chunkSize: number;
 	/** Chunk overlap (tokens) */
 	chunkOverlap: number;
+
+	// Tool Settings
+	/** Whether to enable tool use (file editing, creation, etc.) */
+	enableTools: boolean;
 }
 
 export const DEFAULT_SETTINGS: ObiSettings = {
@@ -126,6 +130,9 @@ export const DEFAULT_SETTINGS: ObiSettings = {
 	minSimilarityScore: 0.3,
 	chunkSize: 500,
 	chunkOverlap: 50,
+
+	// Tool Settings
+	enableTools: true,
 };
 
 export class ObiSettingTab extends PluginSettingTab {
@@ -589,6 +596,38 @@ export class ObiSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		// ============================================
+		// Tool Settings
+		// ============================================
+		containerEl.createEl("h3", { text: "Agent tools" });
+
+		new Setting(containerEl)
+			.setName("Enable agent tools")
+			.setDesc(
+				"Allow Obi to create and edit files in your vault. When enabled, you can ask Obi to create notes, edit content, and manage files."
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableTools)
+					.onChange(async (value) => {
+						this.plugin.settings.enableTools = value;
+						await this.plugin.saveSettings();
+					})
+			);
+
+		if (this.plugin.settings.enableTools) {
+			const toolInfoEl = containerEl.createDiv({
+				cls: "obi-setting-info",
+			});
+			toolInfoEl.createEl("p", {
+				text: "Available tools: create_file, edit_file, read_file, list_files, search_vault",
+			});
+			toolInfoEl.createEl("p", {
+				text: '💡 Tip: Ask Obi to "create a note about..." or "edit [file] to add..." to use these tools.',
+				cls: "obi-setting-hint",
+			});
+		}
 
 		// ============================================
 		// Omnisearch Settings

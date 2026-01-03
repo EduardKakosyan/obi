@@ -1,4 +1,10 @@
 import { ChatMessage } from "../types";
+import {
+	ToolDefinition,
+	ToolCall,
+	ToolResult,
+	LLMResponse,
+} from "../tools/types";
 
 /**
  * Provider types for LLM and Embedding services
@@ -8,13 +14,26 @@ export type EmbeddingProvider = "local" | "gemini";
 export type VectorStoreProvider = "chromadb" | "pinecone";
 
 /**
+ * Options for chat requests
+ */
+export interface ChatOptions {
+	/** Tool definitions to make available to the LLM */
+	tools?: ToolDefinition[];
+	/** Results from previous tool calls */
+	toolResults?: ToolResult[];
+}
+
+/**
  * Unified interface for LLM clients
  */
 export interface ILMClient {
 	/**
 	 * Send a chat completion request
+	 * @param messages The conversation history
+	 * @param options Optional settings including tools
+	 * @returns Response that may contain text or tool calls
 	 */
-	chat(messages: ChatMessage[]): Promise<ChatMessage>;
+	chat(messages: ChatMessage[], options?: ChatOptions): Promise<LLMResponse>;
 
 	/**
 	 * Update client configuration
@@ -25,6 +44,11 @@ export interface ILMClient {
 	 * Test connection to the LLM service
 	 */
 	testConnection(): Promise<boolean>;
+
+	/**
+	 * Whether this client supports tool/function calling
+	 */
+	supportsTools(): boolean;
 }
 
 /**
@@ -84,5 +108,3 @@ export class EmbeddingClientError extends Error {
 		this.name = "EmbeddingClientError";
 	}
 }
-
-

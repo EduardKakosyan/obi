@@ -1,6 +1,7 @@
 import { requestUrl } from "obsidian";
 import { ChatMessage } from "../types";
-import { ILMClient, LLMClientError } from "./types";
+import { ToolDefinition, ToolCall, ToolResult, LLMResponse } from "../tools/types";
+import { ILMClient, ChatOptions, LLMClientError } from "./types";
 
 export interface GeminiLMClientConfig {
 	apiKey: string;
@@ -8,15 +9,41 @@ export interface GeminiLMClientConfig {
 	timeout?: number;
 }
 
+/** Gemini content part - can be text or function call/response */
+interface GeminiPart {
+	text?: string;
+	functionCall?: {
+		name: string;
+		args: Record<string, unknown>;
+	};
+	functionResponse?: {
+		name: string;
+		response: {
+			content: string;
+		};
+	};
+}
+
 interface GeminiContent {
 	role: "user" | "model";
-	parts: Array<{ text: string }>;
+	parts: GeminiPart[];
+}
+
+/** Gemini function declaration format */
+interface GeminiFunctionDeclaration {
+	name: string;
+	description: string;
+	parameters: {
+		type: "object";
+		properties: Record<string, unknown>;
+		required?: string[];
+	};
 }
 
 interface GeminiResponse {
 	candidates?: Array<{
 		content: {
-			parts: Array<{ text: string }>;
+			parts: GeminiPart[];
 			role: string;
 		};
 		finishReason: string;
@@ -43,10 +70,32 @@ export class GeminiLMClient implements ILMClient {
 	}
 
 	/**
+	 * Convert tool definitions to Gemini function declaration format
+	 */
+	private convertToolsToGeminiFormat(
+		tools: ToolDefinition[]
+	): { functionDeclarations: GeminiFunctionDeclaration[] } {
+		return {
+			functionDeclarations: tools.map((tool) => ({
+				name: tool.name,
+				description: tool.description,
+				parameters: {
+					type: "object",
+					properties: tool.parameters.properties,
+					required: tool.parameters.required,
+				},
+			})),
+		};
+	}
+
+	/**
 	 * Convert ChatMessage array to Gemini format
 	 * Gemini expects "user" and "model" roles, with system instructions handled separately
 	 */
-	private convertToGeminiFormat(messages: ChatMessage[]): {
+	private convertToGeminiFormat(
+		messages: ChatMessage[],
+		toolResults?: ToolResult[]
+	): {
 		contents: GeminiContent[];
 		systemInstruction?: { parts: Array<{ text: string }> };
 	} {
@@ -70,6 +119,26 @@ export class GeminiLMClient implements ILMClient {
 			}
 		}
 
+		// Add tool results as function responses if provided
+		if (toolResults && toolResults.length > 0) {
+			// Tool results should be added as a user message with functionResponse parts
+			const functionResponseParts: GeminiPart[] = toolResults.map(
+				(result) => ({
+					functionResponse: {
+						name: result.callId.split("_")[0] || "unknown", // Extract tool name from callId
+						response: {
+							content: result.content,
+						},
+					},
+				})
+			);
+
+			contents.push({
+				role: "user",
+				parts: functionResponseParts,
+			});
+		}
+
 		// Ensure conversation starts with user message (Gemini requirement)
 		// If it starts with model, prepend an empty user turn
 		if (contents.length > 0 && contents[0].role === "model") {
@@ -85,11 +154,16 @@ export class GeminiLMClient implements ILMClient {
 	/**
 	 * Send a chat completion request to Gemini
 	 */
-	async chat(messages: ChatMessage[]): Promise<ChatMessage> {
+	async chat(
+		messages: ChatMessage[],
+		options?: ChatOptions
+	): Promise<LLMResponse> {
 		const url = `${this.baseUrl}/models/${this.config.model}:generateContent?key=${this.config.apiKey}`;
 
-		const { contents, systemInstruction } =
-			this.convertToGeminiFormat(messages);
+		const { contents, systemInstruction } = this.convertToGeminiFormat(
+			messages,
+			options?.toolResults
+		);
 
 		const requestBody: Record<string, unknown> = {
 			contents,
@@ -101,6 +175,11 @@ export class GeminiLMClient implements ILMClient {
 
 		if (systemInstruction) {
 			requestBody.systemInstruction = systemInstruction;
+		}
+
+		// Add tools if provided
+		if (options?.tools && options.tools.length > 0) {
+			requestBody.tools = [this.convertToolsToGeminiFormat(options.tools)];
 		}
 
 		try {
@@ -143,14 +222,31 @@ export class GeminiLMClient implements ILMClient {
 				throw new LLMClientError("Empty response from Gemini");
 			}
 
-			// Combine all text parts
-			const responseText = candidate.content.parts
-				.map((part) => part.text)
-				.join("");
+			// Check if response contains function calls
+			const functionCalls = candidate.content.parts.filter(
+				(part) => part.functionCall
+			);
+
+			if (functionCalls.length > 0) {
+				// Convert Gemini function calls to our ToolCall format
+				const toolCalls: ToolCall[] = functionCalls.map((part, index) => ({
+					id: `${part.functionCall!.name}_${Date.now()}_${index}`,
+					name: part.functionCall!.name,
+					arguments: part.functionCall!.args,
+				}));
+
+				return { toolCalls };
+			}
+
+			// Regular text response
+			const textParts = candidate.content.parts.filter((part) => part.text);
+			const responseText = textParts.map((part) => part.text).join("");
 
 			return {
-				role: "assistant",
-				content: responseText,
+				message: {
+					role: "assistant",
+					content: responseText,
+				},
 			};
 		} catch (error) {
 			if (error instanceof LLMClientError) {
@@ -182,11 +278,18 @@ export class GeminiLMClient implements ILMClient {
 			const response = await this.chat([
 				{ role: "user", content: "Say 'ok' and nothing else." },
 			]);
-			return !!response.content;
+			return !!response.message?.content;
 		} catch (e) {
 			console.error("[Obi] Gemini LLM test failed:", e);
 			return false;
 		}
+	}
+
+	/**
+	 * Gemini supports function calling
+	 */
+	supportsTools(): boolean {
+		return true;
 	}
 }
 

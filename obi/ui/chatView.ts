@@ -117,7 +117,7 @@ export class ObiChatView extends ItemView {
 			attr: { "aria-label": "Clear chat" },
 		});
 		setIcon(clearBtn, "trash-2");
-		clearBtn.addEventListener("click", () => this.clearChat());
+		this.registerDomEvent(clearBtn, "click", () => this.clearChat());
 
 		// Create messages container
 		this.messagesContainer = container.createDiv({
@@ -146,10 +146,14 @@ export class ObiChatView extends ItemView {
 		});
 		setIcon(this.sendButton, "send");
 
-		// Event listeners
-		this.sendButton.addEventListener("click", () => this.handleSend());
-		this.inputEl.addEventListener("keydown", (e) => this.handleKeyDown(e));
-		this.inputEl.addEventListener("input", () => this.handleInput());
+		// Event listeners - use registerDomEvent for proper cleanup
+		this.registerDomEvent(this.sendButton, "click", () =>
+			this.handleSend()
+		);
+		this.registerDomEvent(this.inputEl, "keydown", (e) =>
+			this.handleKeyDown(e)
+		);
+		this.registerDomEvent(this.inputEl, "input", () => this.handleInput());
 
 		// Close suggestions when clicking outside
 		this.registerDomEvent(document, "click", (e) => {
@@ -520,10 +524,10 @@ export class ObiChatView extends ItemView {
 				scoreBadge.setText(Math.round(suggestion.score).toString());
 			}
 
-			item.addEventListener("click", () =>
+			this.registerDomEvent(item, "click", () =>
 				this.selectSuggestion(suggestion)
 			);
-			item.addEventListener("mouseenter", () => {
+			this.registerDomEvent(item, "mouseenter", () => {
 				this.selectedSuggestionIndex = i;
 				this.updateSuggestionsHighlight();
 			});
@@ -1068,7 +1072,7 @@ If you need to see a file's contents before editing, use read_file first.`;
 				chip.createSpan({ text: mention.displayName });
 
 				// Click to open the file
-				chip.addEventListener("click", () => {
+				this.registerDomEvent(chip, "click", () => {
 					this.plugin.app.workspace.openLinkText(
 						mention.file.path,
 						"",

@@ -1,6 +1,11 @@
 import { requestUrl } from "obsidian";
 import { ChatMessage } from "../types";
-import { ToolDefinition, ToolCall, ToolResult, LLMResponse } from "../tools/types";
+import {
+	ToolDefinition,
+	ToolCall,
+	ToolResult,
+	LLMResponse,
+} from "../tools/types";
 import { ILMClient, ChatOptions, LLMClientError } from "./types";
 
 export interface GeminiLMClientConfig {
@@ -70,11 +75,26 @@ export class GeminiLMClient implements ILMClient {
 	}
 
 	/**
+	 * Extract tool name from callId
+	 * CallId format: "toolName::timestamp::index"
+	 */
+	private extractToolNameFromCallId(callId: string): string {
+		// Split by :: separator (used to avoid conflicts with underscores in tool names)
+		const parts = callId.split("::");
+		if (parts.length >= 1 && parts[0]) {
+			return parts[0];
+		}
+		// Fallback: try underscore separator for backwards compatibility
+		// This handles older format but may fail for multi-underscore tool names
+		return callId.split("_")[0] || "unknown";
+	}
+
+	/**
 	 * Convert tool definitions to Gemini function declaration format
 	 */
-	private convertToolsToGeminiFormat(
-		tools: ToolDefinition[]
-	): { functionDeclarations: GeminiFunctionDeclaration[] } {
+	private convertToolsToGeminiFormat(tools: ToolDefinition[]): {
+		functionDeclarations: GeminiFunctionDeclaration[];
+	} {
 		return {
 			functionDeclarations: tools.map((tool) => ({
 				name: tool.name,
@@ -125,7 +145,7 @@ export class GeminiLMClient implements ILMClient {
 			const functionResponseParts: GeminiPart[] = toolResults.map(
 				(result) => ({
 					functionResponse: {
-						name: result.callId.split("_")[0] || "unknown", // Extract tool name from callId
+						name: this.extractToolNameFromCallId(result.callId),
 						response: {
 							content: result.content,
 						},
@@ -179,7 +199,9 @@ export class GeminiLMClient implements ILMClient {
 
 		// Add tools if provided
 		if (options?.tools && options.tools.length > 0) {
-			requestBody.tools = [this.convertToolsToGeminiFormat(options.tools)];
+			requestBody.tools = [
+				this.convertToolsToGeminiFormat(options.tools),
+			];
 		}
 
 		try {
@@ -229,17 +251,24 @@ export class GeminiLMClient implements ILMClient {
 
 			if (functionCalls.length > 0) {
 				// Convert Gemini function calls to our ToolCall format
-				const toolCalls: ToolCall[] = functionCalls.map((part, index) => ({
-					id: `${part.functionCall!.name}_${Date.now()}_${index}`,
-					name: part.functionCall!.name,
-					arguments: part.functionCall!.args,
-				}));
+				// Use :: as separator to avoid conflicts with underscores in tool names
+				const toolCalls: ToolCall[] = functionCalls.map(
+					(part, index) => ({
+						id: `${
+							part.functionCall!.name
+						}::${Date.now()}::${index}`,
+						name: part.functionCall!.name,
+						arguments: part.functionCall!.args,
+					})
+				);
 
 				return { toolCalls };
 			}
 
 			// Regular text response
-			const textParts = candidate.content.parts.filter((part) => part.text);
+			const textParts = candidate.content.parts.filter(
+				(part) => part.text
+			);
 			const responseText = textParts.map((part) => part.text).join("");
 
 			return {
